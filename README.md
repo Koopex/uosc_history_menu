@@ -1,0 +1,2 @@
+# uosc_history_menu
+在MPV播放器中添加基于uosc的播放记录列表
