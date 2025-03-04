@@ -9,7 +9,7 @@
  ![图片](https://github.com/Koopex/uosc_history_menu/blob/main/preview/%E5%85%A8%E9%83%A8.png?raw=true)
  - 去重：每个视频只显示一条最新的记录（`menu_filter=dry`）
  ![图片](https://github.com/Koopex/uosc_history_menu/blob/main/preview/%E5%8E%BB%E9%87%8D.png?raw=true)
- - 目录：列出播放过的目录（`menu_filter=directory`）
+ - 目录：列出播放过的目录（`menu_filter=directory`）,适合同时看多个剧
 ![图片](https://github.com/Koopex/uosc_history_menu/blob/main/preview/%E7%9B%AE%E5%BD%95.png?raw=true)
 ### 删除播放记录
 打开列表，移动到选择的记录，点击删除图标或者按Delete键删除，不同的过滤方式中，删除的记录不同：
