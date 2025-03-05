@@ -1,7 +1,7 @@
 # uosc_history_menu
 在MPV播放器中添加基于uosc的播放记录列表。
 # 主要功能
-## 1. 播放记录列表
+## 1. 播放记录
 ### 播放记录过滤
 更改`script-opts/uosc_history_menu.conf`的`menu_filter`可以设置默认的过滤方式。
 打开列表时可以按键切换过滤方式：方向键←/→。
@@ -22,6 +22,9 @@
  - 过滤方式为“全部”时，删除选定的记录。
  - 过滤方式为“去重”时，删除该视频所有的记录。
  - 过滤方式为“目录”时，删除该目录所有的记录。
+### 流媒体播放记录
+ - 默认关闭, `log_url=yes`开启
+ - 建议配合[外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)和[uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)使用
 ## 2. 恢复播放
 ### 使用快捷键
  按下`空格`, 恢复上次播放的文件(快捷键可以更改)
@@ -66,4 +69,11 @@
   
  - 如果简化的效果不理想可以添加屏蔽词：`blocked_words=`
  屏蔽词较长的写在前面，短的在后，用`,`连接。屏蔽词中的`-`和`.`前面要加上`%`，如`WEB-DL`要写成`WEB%-DL`
-
+# 感谢!
+特别感谢以下项目提供参考!
+ - [mpv](https://github.com/mpv-player/mpv)
+ - [mpv_lazy](https://github.com/hooke007/MPV_lazy)
+ - [uosc](https://github.com/tomasklaen/uosc)
+ - [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
+ - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
+ - [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
