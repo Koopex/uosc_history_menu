@@ -6,6 +6,7 @@ local o ={
 	menu_filter = 'all',
 	last_video = true,
 	hint = 'position+duration',
+	log_url = true,
 	simplified_media_title = false,
 	blocked_words = '',
 	log_path = '/:dir%mpvconf%/uosc_history_menu.log' ,
@@ -27,6 +28,8 @@ local menu_showing = false -- 记录菜单的开闭状态
 local from_mpv = false -- 区分"直接打开视频"和"用此脚本打开的视频"
 local time_pos = 0 -- 关闭文件时的播放时长
 local seek_time = '' -- 恢复上次的播放
+local http_media_title = '' -- 记录流媒体标题
+local http_audio_path = 'nil' -- 记录流媒体音频链接
 local log_part = {} -- 前半部分日志
 local items = {} -- 记录菜单条目, 不用反复获取
 local words = {} -- 屏蔽词, 只有在开启简化标题时加载
@@ -128,45 +131,31 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 	local entries = {}
 	if next(arry) ~= nill then
 		if o.menu_filter == 'directory' then
-			if arry[#arry].position_sec == nil then
-				table.insert(entries, arry[#arry])
-				for i = #arry - 1, 1, -1 do
-					local v = arry[i]
-					local x = v.upper_path
-					if not seen[x] then
-						table.insert(entries, v)
-						seen[x] = true
-					end
-				end		
-			else
-				for i = #arry, 1, -1 do
-					local v = arry[i]
-					local x = v.upper_path
-					if not seen[x] then
-						table.insert(entries, v)
-						seen[x] = true
-					end
+			for i = #arry, 1, -1 do
+				local v = arry[i]
+				local x = ''
+				if v.upper_path:sub(1,4) ~= 'http' then
+					x = v.upper_path
+				else
+					x = v.media_title
 				end
-			end	
+				if not seen[x] then
+					table.insert(entries, v)
+					seen[x] = true
+				end
+			end
 		elseif o.menu_filter == 'dry' then
-			if arry[#arry].position_sec == nil then
-				table.insert(entries, arry[#arry])
-				for i = #arry - 1, 1, -1 do
-					local v = arry[i]
-					local x = v.path
-					if not seen[x] then
-						table.insert(entries, v)
-						seen[x] = true
-					end
-				end						
-			else
-				for i = #arry, 1, -1 do
-					local v = arry[i]
-					local x = v.path
-					if not seen[x] then
-						table.insert(entries, v)
-						seen[x] = true
-					end
+			for i = #arry, 1, -1 do
+				local v = arry[i]
+				local x = ''
+				if v.upper_path:sub(1,4) ~= 'http' then
+					x = v.path
+				else
+					x = v.media_title
+				end
+				if not seen[x] then
+					table.insert(entries, v)
+					seen[x] = true
 				end
 			end
 		elseif o.menu_filter == 'all' then
@@ -216,7 +205,7 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 			elseif o.hint == 'percent+duration' then hint = string.format('%s  %s', arr.percent, arr.duration_for)
 			end
 		else  hint = arr.position_in_folder end
-		table.insert(result, {title = title, hint = hint, value = { 'loadfile',arr.path, arr.position_sec}, icon = icon, active = active, actions = actions, })
+		table.insert(result, {title = title, hint = hint, value = {arr.media_title, arr.path, arr.position_sec, arr.upper_path}, icon = icon, active = active, actions = actions, })
 	end
 	items = result
 end
@@ -251,7 +240,7 @@ local function toggleMenu() -- 开关菜单
 	if menu_type ~= 'history_list' then openMenu(1)	
 	else mp.commandv('script-message-to', 'uosc', 'close-menu') end
 end
-local function turnLast() -- 标记本目录上次播放的视频
+local function turnLast() -- 表基础本目录上次播放的视频
 	local num = 0
 	for i = 1, #items do
 		local item = items[i]
@@ -282,15 +271,26 @@ local function playLastVideo() -- 继续播放上次的文件
 end
 local function preLog() -- 加载视频时先记录一部分日志(log_part), 结束播放时补充为完整的日志。因为time_pos只能在'end-file'时获取,而其他属性在'end-file'时获取不到,所以只能分两次记录。
 	local path = mp.get_property('path', '') 
-	if path:sub(1,4) ~= 'http' then
-		local system_time = string.format('[%s]', os.date('%Y-%m-%d %H:%M:%S'))
-		local media_title = mp.get_property('media-title', '') 
+	local system_time = string.format('[%s]', os.date('%Y-%m-%d %H:%M:%S'))
+	local media_title = mp.get_property('media-title', '') 
+	local duration = mp.get_property('duration', '')
+	if path:sub(1,4) == 'http' then
+		if o.log_url then
+			local track_list = mp.get_property_native("track-list")
+			local audio = 'nil'
+			for _, track in ipairs(track_list) do
+				if track['type'] == 'audio' and track['external'] then
+					audio = track['external-filename']
+				end
+			end
+			log_part = {system_time, media_title, media_title, path, audio, media_title, '流媒体', duration}
+		end
+	else
 		local file_name = mp.get_property('filename', '') 
 		local upper_path = path:gsub('\\[^\\]*$', '')
-		local parent_folder = path:gsub('\\[^\\]*$', ''):match('([^\\]+)$') -- 当过滤方式为目录时, 显示的目录名, 中间再加一个:gsub('\\[^\\]*$', '')可以显示再上一级的文件夹名, 如下一行
---		local parent_folder = path:gsub('\\[^\\]*$', ''):gsub('\\[^\\]*$', ''):match('([^\\]+)$')
+		local parent_folder = path:gsub('\\[^\\]*$', ''):match('([^\\]+)$') -- 菜单过滤方式为目录时, 显示的文件夹名, 中间再加一个:gsub('\\[^\\]*$', '')可以显示再上一级的文件夹名, 如下
+--		local parent_folder = path:gsub('\\[^\\]*$', ''):gsub('\\[^\\]*$', ''):match('([^\\]+)$') 
 		local position_in_folder = findPosition(path)
-		local duration = mp.get_property('duration', '')
 		log_part = {system_time, media_title, file_name, path, upper_path, parent_folder, position_in_folder, duration}
 	end
 end
@@ -318,6 +318,12 @@ local function deleteLog(type, target) -- 删除日志条目
 	elseif type == 'upper_path' then
 		for i, line in ipairs(old_log) do
 			if line.upper_path ~= target then
+				table.insert(new_log,line)
+			end
+		end
+	elseif type == 'media_title' then
+		for i, line in ipairs(old_log) do
+			if line.media_title ~= target and line.path:sub(1,4) ~= 'http' then
 				table.insert(new_log,line)
 			end
 		end
@@ -359,7 +365,19 @@ end)
 mp.register_event('file-loaded', function() -- 加载文件后的行为
 	if o.simplified_media_title then
 		local file_name = mp.get_property('filename', '') 
-		mp.set_property_native('file-local-options/force-media-title',simplifyTitle(file_name))
+		local path = mp.get_property('path', '') 
+		if path:sub(1,4) ~= 'http' then
+			mp.set_property_native('file-local-options/force-media-title',simplifyTitle(file_name))
+		
+		end
+	end
+	if http_media_title ~= '' then
+		mp.set_property_native('file-local-options/force-media-title',http_media_title)
+		http_media_title = ''
+	end
+	if http_audio_path ~= 'nil' then
+		mp.commandv('audio-add', http_audio_path)
+		http_audio_path = 'nil'
 	end
 	if seek_time ~= '' then
 		local t = tonumber(seek_time)
@@ -418,18 +436,30 @@ mp.register_script_message('menu-event', function(json) -- 注册 菜单操作�
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			elseif o.menu_filter == 'dry' then
-				deleteLog('path', event.value[2])
+				if event.value[2]:sub(1,4) ~= 'http' then
+					deleteLog('path', event.value[2])
+				else
+					deleteLog('media_title', event.value[1])
+				end
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			elseif o.menu_filter == 'directory' then
-				deleteLog('upper_path', event.value[2]:gsub('\\[^\\]*$', ''))
+				if event.value[2]:sub(1,4) ~= 'http' then
+					deleteLog('upper_path', event.value[2]:gsub('\\[^\\]*$', ''))
+				else
+					deleteLog('media_title', event.value[1])
+				end
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			end
 		else
 			from_mpv = true
-			mp.commandv('loadfile', event.value[2])
+			mp.commandv('loadfile', event.value[2])			
 			seek_time = event.value[3]
+			if event.value[2]:sub(1,4) == 'http' then
+				http_media_title = event.value[1]
+				http_audio_path = event.value[4]
+			end
 			mp.commandv('script-message-to', 'uosc', 'close-menu')
 		end
 	elseif event.type == 'key' then
