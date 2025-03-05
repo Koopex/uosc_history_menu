@@ -6,7 +6,7 @@ local o ={
 	menu_filter = 'all',
 	last_video = true,
 	hint = 'position+duration',
-	log_url = true,
+	log_url = false,
 	simplified_media_title = false,
 	blocked_words = '',
 	log_path = '/:dir%mpvconf%/uosc_history_menu.log' ,
@@ -263,6 +263,10 @@ local function playLastVideo() -- 继续播放上次的文件
 		from_mpv = true
 		mp.commandv('loadfile',items[1].value[2])
 		seek_time = items[1].value[3]
+		if items[1].value[2]:sub(1,4) == 'http' then
+			http_media_title = items[1].value[1]
+			http_audio_path = items[1].value[4]
+		end
 		mp.set_property('pause', 'no')
 		mp.commandv('script-message-to', 'uosc', 'close-menu')
 	elseif not v and o.space then
@@ -352,6 +356,10 @@ mp.observe_property('idle-active', 'bool', function(_, v) -- mpv空闲时的行�
 				from_mpv = true
 				mp.commandv('loadfile',items[1].value[2])
 				seek_time = items[1].value[3]
+				if items[1].value[2]:sub(1,4) == 'http' then
+					http_media_title = items[1].value[1]
+					http_audio_path = items[1].value[4]
+				end
 			end
 		else getItems()
 		end
