@@ -39,7 +39,7 @@
 ## 1. 添加uosc按钮
  在uosc的script-opts中，在`controls=`后面找到合适的位置添加`button:history`：
 ```
- controls =	'menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen',
+ controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen',
 ```
 ## 2. 绑定快捷键
 在`input.conf`中添加以下三行，可以绑定快捷键:
