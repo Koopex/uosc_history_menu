@@ -39,14 +39,14 @@
 ## 1. 添加uosc按钮
  在uosc的script-opts中，在`controls=`后面找到合适的位置添加`button:history`：
 ```
- controls =	'menu,button:historygap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen',
+ controls =	'menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen',
 ```
 ## 2. 绑定快捷键
 在`input.conf`中添加以下三行，可以绑定快捷键:
 ```
- SPACE   script-message play_last_video
- r       script-message toggle_history_menu
- Ctrl+r  script-message clear_history
+ SPACE   script-binding uosc_history_menu/play_last_video
+ r       script-binding uosc_history_menu/toggle_history_menu
+ Ctrl+r  script-binding uosc_history_menu/clear_history
 ```
 按`空格`恢复上次播放,为避免冲突还要把原来的空格取消绑定,在`script-opts/uosc_history_menu.conf`中设置`space=yes`(不绑定`空格`就设为`no`)
 按`r`键开关列表
