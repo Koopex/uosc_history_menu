@@ -29,7 +29,7 @@ local from_mpv = false -- 区分"直接打开视频"和"用此脚本打开的视
 local time_pos = 0 -- 关闭文件时的播放时长
 local seek_time = '' -- 恢复上次的播放
 local http_media_title = '' -- 记录流媒体标题
-local http_audio_path = 'nil' -- 记录流媒体音频链接
+local http_audio_path = 'null' -- 记录流媒体音频链接
 local log_part = {} -- 前半部分日志
 local items = {} -- 记录菜单条目, 不用反复获取
 local words = {} -- 屏蔽词, 只有在开启简化标题时加载
@@ -134,7 +134,7 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 			for i = #arry, 1, -1 do
 				local v = arry[i]
 				local x = ''
-				if v.upper_path:sub(1,4) ~= 'http' then
+				if v.position_in_folder ~= '流媒体' then
 					x = v.upper_path
 				else
 					x = v.media_title
@@ -148,7 +148,7 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 			for i = #arry, 1, -1 do
 				local v = arry[i]
 				local x = ''
-				if v.upper_path:sub(1,4) ~= 'http' then
+				if v.position_in_folder ~= '流媒体' then
 					x = v.path
 				else
 					x = v.media_title
@@ -186,7 +186,8 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 		11播放进度(百分比)	percent
 		--]]			
 		local title = ''
-		if o.menu_filter ~= 'directory' then title = arr.media_title			
+		if o.menu_filter ~= 'directory' then 
+			title = arr.media_title			
 		else
 			if o.simplified_media_title then
 				title = simplifyTitle(arr.parent_folder) .. '/'
@@ -194,7 +195,7 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 		end
 		local hint = ''
 		local icon = ''
-		local actions = {{name = 'delete', icon = 'delete', label = '删除该记录：点击按钮 / 按下“Delete”'},}
+		local actions = {{name = 'delete', icon = 'delete', label = '删除该记录：按下“Delete”'},}
 		local active = false
 		if o.menu_filter ~= 'directory' then			
 			if o.hint == 'date' then hint = arr.date_time:sub(7, -5)
@@ -204,8 +205,12 @@ local function getItems() -- 从日志条目提取内容用来组建菜单
 			elseif o.hint == 'position+duration' then hint = string.format('%s / %s', arr.position_for, arr.duration_for) 
 			elseif o.hint == 'percent+duration' then hint = string.format('%s  %s', arr.percent, arr.duration_for)
 			end
-		else  hint = arr.position_in_folder end
-		table.insert(result, {title = title, hint = hint, value = {arr.media_title, arr.path, arr.position_sec, arr.upper_path}, icon = icon, active = active, actions = actions, })
+		else  hint = arr.position_in_folder end										------- 按键返回值 --------
+		if arr.position_in_folder ~= '流媒体' then					-- 本地文件:	1 播放进度	2 视频路径
+			table.insert(result, {title = title, hint = hint, value = {arr.position_sec, arr.path}, icon = icon, active = active, actions = actions, })
+		else												-- 流媒体:	1 播放进度	2 视频路径	3 音频路径	4 媒体标题
+			table.insert(result, {title = title, hint = hint, value = {arr.position_sec, arr.path, arr.upper_path, arr.media_title}, icon = icon, active = active, actions = actions, })			
+		end
 	end
 	items = result
 end
@@ -215,11 +220,7 @@ local function openMenu(num) -- 打开菜单
 	if o.menu_filter == 'all' then menu_title = '播放记录（全部）'
 	elseif o.menu_filter == 'dry' then menu_title = '播放记录（去重）'
 	elseif o.menu_filter == 'directory' then menu_title = '播放记录（目录）' end
-	if next(items) == nil then
-		menu_props = {type = 'history_list', title = '播放记录', search_style = 'disabled', footnote = '播放任意视频进行记录',
-		items = {{title = '暂无播放记录', hint = '', value = {}, selectable = false, align = 'center',italic = true, }, }, }
-	else 	menu_props = {type = 'history_list', title = menu_title, selected_index = num, callback = {mp.get_script_name(), 'menu-event'},items = items, footnote = '播放:ENTER   切换过滤方式:← / →   搜索记录:Ctrl+f 或 \\',}
-	end	
+	menu_props = {type = 'history_list', title = menu_title, selected_index = num, callback = {mp.get_script_name(), 'menu_event'},items = items, footnote = '切换过滤方式:← / →   搜索记录:Ctrl+f',}
 	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
 end
 local function updateMenu(num) -- 更新菜单(删除记录后使用)
@@ -227,13 +228,22 @@ local function updateMenu(num) -- 更新菜单(删除记录后使用)
 	local menu_title = ''
 	if o.menu_filter == 'all' then menu_title = '播放记录（全部）'
 	elseif o.menu_filter == 'dry' then menu_title = '播放记录（去重）'
-	elseif o.menu_filter == 'directory' then menu_title = '播放记录（目录）' end
-	if next(items) == nil then
-		menu_props = {type = 'history_list', title = '播放记录', search_style = 'disabled', footnote = '播放任意视频进行记录',
-		items = {{title = '暂无播放记录', hint = '', value = {}, selectable = false, align = 'center',italic = true, }, }, }
-	else 	menu_props = {type = 'history_list', title = menu_title, selected_index = num, callback = {mp.get_script_name(), 'menu-event'},items = items, footnote = '播放:ENTER   切换过滤方式:← / →   搜索记录:Ctrl+f 或 \\',}
-	end	
+	elseif o.menu_filter == 'directory' then menu_title = '播放记录（目录）' end	
+	menu_props = {type = 'history_list', title = menu_title, selected_index = num, callback = {mp.get_script_name(), 'menu_event'},items = items, footnote = '切换过滤方式:← / →   搜索记录:Ctrl+f',}
 	mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(menu_props))
+end
+local function confirm() -- 清空记录前确认
+	local menu_props = {type = 'history_list', title = '清空播放记录?',
+		items = {
+			{title = '确定', align = 'center', bold = 'true', value = {'script-message-to', mp.get_script_name(), 'do_clear_history'},}, 
+			{title = '取消', align = 'center', bold = 'true', value = {'ignore'},},
+			},
+		selected_index = 2, search_style = 'disabled',}
+	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+end
+local function clearHistory() -- 清空记录
+	io.open(o.log_path, 'w'):close() 
+	getItems()
 end
 local function toggleMenu() -- 开关菜单
 	local menu_type = mp.get_property_native('user-data/uosc/menu/type')
@@ -242,30 +252,33 @@ local function toggleMenu() -- 开关菜单
 end
 local function turnLast() -- 表基础本目录上次播放的视频
 	local num = 0
+	local playing_path = mp.get_property('path', '')
 	for i = 1, #items do
 		local item = items[i]
-		if item.value[2]:gsub('\\[^\\]*$', '') == mp.get_property('path', ''):gsub('\\[^\\]*$', '') then 
-			if item.icon ~= 'done' then
+		if item.value[2]:gsub('\\[^\\]*$', '') == playing_path:gsub('\\[^\\]*$', '') then 
+--			if item.icon ~= 'done' then
 				num = i 
 				break
-			end
+--			end
 		end
 	end
 	if num ~= 0 then
 		items[num].icon = 'history'
 		items[num].actions_place = 'outside'
-		if not loaded and not from_mpv and o.last_video then openMenu(num) end
+		if not loaded and not from_mpv and o.last_video and items[num].value[2] ~= playing_path then openMenu(num) end
 	end
 end
 local function playLastVideo() -- 继续播放上次的文件
 	local v = mp.get_property_bool('idle-active', 'false')
 	if v then
 		from_mpv = true
+		-- 流媒体:	1 播放进度	2 视频路径	3 音频路径	4 媒体标题
+		-- 本地文件:	1 播放进度	2 视频路径
 		mp.commandv('loadfile',items[1].value[2])
-		seek_time = items[1].value[3]
-		if items[1].value[2]:sub(1,4) == 'http' then
-			http_media_title = items[1].value[1]
-			http_audio_path = items[1].value[4]
+		seek_time = items[1].value[1]
+		if items[1].value[3] ~= nil then
+			http_audio_path = items[1].value[3]
+			http_media_title = items[1].value[4]
 		end
 		mp.set_property('pause', 'no')
 		mp.commandv('script-message-to', 'uosc', 'close-menu')
@@ -281,7 +294,7 @@ local function preLog() -- 加载视频时先记录一部分日志(log_part), �
 	if path:sub(1,4) == 'http' then
 		if o.log_url then
 			local track_list = mp.get_property_native("track-list")
-			local audio = 'nil'
+			local audio = 'null'
 			for _, track in ipairs(track_list) do
 				if track['type'] == 'audio' and track['external'] then
 					audio = track['external-filename']
@@ -327,7 +340,8 @@ local function deleteLog(type, target) -- 删除日志条目
 		end
 	elseif type == 'media_title' then
 		for i, line in ipairs(old_log) do
-			if line.media_title ~= target and line.path:sub(1,4) ~= 'http' then
+			if line.media_title == target and line.position_in_folder == '流媒体' then
+			else
 				table.insert(new_log,line)
 			end
 		end
@@ -342,6 +356,8 @@ local function deleteLog(type, target) -- 删除日志条目
 end
 
 
+mp.commandv('script-message-to', 'uosc', 'set-button', 'history', -- 添加 uosc 按钮
+	utils.format_json({ icon = 'history', tooltip = '播放记录', command = 'script-message toggle_history_menu', }))
 
 mp.observe_property('idle-active', 'bool', function(_, v) -- mpv空闲时的行为
 	if v and not loaded then
@@ -354,11 +370,13 @@ mp.observe_property('idle-active', 'bool', function(_, v) -- mpv空闲时的行�
 				openMenu(1)
 			else
 				from_mpv = true
+				-- 流媒体:	1 播放进度	2 视频路径	3 音频路径	4 媒体标题
+				-- 本地文件:	1 播放进度	2 视频路径
 				mp.commandv('loadfile',items[1].value[2])
-				seek_time = items[1].value[3]
-				if items[1].value[2]:sub(1,4) == 'http' then
-					http_media_title = items[1].value[1]
-					http_audio_path = items[1].value[4]
+				seek_time = items[1].value[1]
+				if items[1].value[3] ~= nil then
+					http_media_title = items[1].value[4]
+					http_audio_path = items[1].value[3]
 				end
 			end
 		else getItems()
@@ -371,21 +389,18 @@ mp.add_hook('on_unload', 9, function() -- 结束播放时获取播放进度
 end)
 
 mp.register_event('file-loaded', function() -- 加载文件后的行为
-	if o.simplified_media_title then
-		local file_name = mp.get_property('filename', '') 
-		local path = mp.get_property('path', '') 
-		if path:sub(1,4) ~= 'http' then
-			mp.set_property_native('file-local-options/force-media-title',simplifyTitle(file_name))
-		
-		end
-	end
-	if http_media_title ~= '' then
+	local path = mp.get_property('path', '') 
+	if path:sub(1,4) == 'http' then
 		mp.set_property_native('file-local-options/force-media-title',http_media_title)
 		http_media_title = ''
+	else
+		if o.simplified_media_title then
+			mp.set_property_native('file-local-options/force-media-title',simplifyTitle(mp.get_property('filename', '') ))
+		end
 	end
-	if http_audio_path ~= 'nil' then
+	if http_audio_path ~= 'null' then
 		mp.commandv('audio-add', http_audio_path)
-		http_audio_path = 'nil'
+		http_audio_path = 'null'
 	end
 	if seek_time ~= '' then
 		local t = tonumber(seek_time)
@@ -413,20 +428,15 @@ mp.register_event('end-file', function() -- 关闭文件后的行为
 	end
 end)
 
-mp.commandv('script-message-to', 'uosc', 'set-button', 'history', -- 添加 uosc 按钮
-	utils.format_json({ icon = 'history', tooltip = '播放记录', command = 'script-message toggle_history_menu', }))
+mp.add_key_binding(nil, 'toggle_history_menu', toggleMenu) -- 注册 开关菜单
 
-mp.register_script_message('toggle_history_menu', toggleMenu) -- 注册 开关菜单
+mp.add_key_binding(nil, 'play_last_video', playLastVideo) -- 注册 继续播放
 
-mp.register_script_message('play_last_video', playLastVideo) -- 注册 继续播放
+mp.add_key_binding(nil, 'clear_history', confirm) -- 注册 询问是否清空记录
 
-mp.register_script_message('clear_history', function() -- 注册 清空记录
-	io.open(o.log_path, 'w'):close() 
-	getItems() 
-	openMenu(1)
-end)
+mp.add_key_binding(nil, 'do_clear_history', clearHistory) -- 清空记录
 
-mp.register_script_message('menu-event', function(json) -- 注册 菜单操作指令(删除记录,加载文件,切换过滤方式)
+mp.register_script_message('menu_event', function(json) -- 注册 菜单操作指令(删除记录,加载文件,切换过滤方式)
 	local event = utils.parse_json(json)
 --	event.type		'activate', 'move', 'search', 'key', 'paste', 'back', 'close'
 --	event.action		item_actions中定义的
@@ -444,29 +454,31 @@ mp.register_script_message('menu-event', function(json) -- 注册 菜单操作�
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			elseif o.menu_filter == 'dry' then
-				if event.value[2]:sub(1,4) ~= 'http' then
+				if event.value[3] == nil then
 					deleteLog('path', event.value[2])
 				else
-					deleteLog('media_title', event.value[1])
+					deleteLog('media_title', event.value[4])
 				end
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			elseif o.menu_filter == 'directory' then
-				if event.value[2]:sub(1,4) ~= 'http' then
+				if event.value[3] == nil then
 					deleteLog('upper_path', event.value[2]:gsub('\\[^\\]*$', ''))
 				else
-					deleteLog('media_title', event.value[1])
+					deleteLog('media_title', event.value[4])
 				end
 				table.remove(items, event.index)
 				updateMenu(event.index)
 			end
 		else
 			from_mpv = true
+			-- 流媒体:	1 播放进度	2 视频路径	3 音频路径	4 媒体标题
+			-- 本地文件:	1 播放进度	2 视频路径
 			mp.commandv('loadfile', event.value[2])			
-			seek_time = event.value[3]
-			if event.value[2]:sub(1,4) == 'http' then
-				http_media_title = event.value[1]
-				http_audio_path = event.value[4]
+			seek_time = event.value[1]
+			if event.value[3] ~= nil then
+				http_media_title = event.value[4]
+				http_audio_path = event.value[3]
 			end
 			mp.commandv('script-message-to', 'uosc', 'close-menu')
 		end
@@ -477,53 +489,39 @@ mp.register_script_message('menu-event', function(json) -- 注册 菜单操作�
 --		event.selected_item.value
 --		event.id
 --		event.menu_id
-		if event.key == 'del' then
-			if o.menu_filter == 'all' then  
-				deleteLog('index', #items-event.selected_item.index+1)
-				table.remove(items, event.selected_item.index)
-				updateMenu(event.selected_item.index)
-			elseif o.menu_filter == 'dry' then
-					deleteLog('path', event.selected_item.value[2])
-					table.remove(items, event.selected_item.index)
-					updateMenu(event.selected_item.index)
-			elseif o.menu_filter == 'directory' then
-				deleteLog('upper_path', event.selected_item.value[2]:gsub('\\[^\\]*$', ''))
-				table.remove(items, event.selected_item.index)
-				updateMenu(event.selected_item.index)
-			end
-		elseif event.key == 'right' then
+		if event.key == 'right' then
 			if o.menu_filter == 'all' then
 				o.menu_filter = 'dry'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			elseif o.menu_filter == 'dry' then
 				o.menu_filter = 'directory'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			elseif o.menu_filter == 'directory' then
 				o.menu_filter = 'all'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			end
 		elseif event.key == 'left' then
 			if o.menu_filter == 'all' then
 				o.menu_filter = 'directory'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			elseif o.menu_filter == 'dry' then
 				o.menu_filter = 'all'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			elseif o.menu_filter == 'directory' then
 				o.menu_filter = 'dry'
 				getItems()
 				turnLast()
-				openMenu(1)
+				updateMenu(1)
 			end
 		end
 	end
