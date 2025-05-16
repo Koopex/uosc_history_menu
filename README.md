@@ -28,7 +28,7 @@ Open the list, navigate to an entry, and click the delete icon or press ​**Del
 * ​`menu_filter=deduplicated`​: Deletes all records of the selected video.
 * ​`menu_filter=folders`​: Deletes all records in the selected folder.
 
-You can also clear the entire history via a hotkey (see: ​[Keybindings](https://github.com/Koopex/uosc_history_menu/edit/main/README.md#3-keybindings)​).
+You can also clear the entire history via a hotkey (see: ​[Keybindings](https://github.com/Koopex/uosc_history_menu?tab=readme-ov-file#3-keybindings​)).
 ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/clear-en.png)
 
 #### Streaming History
