@@ -33,7 +33,7 @@
 - 过滤方式为“去重”时（`menu_filter=deduplicated`），删除该视频所有的记录。
 - 过滤方式为“文件夹”时（`menu_filter=folders`），删除该目录所有的记录。
   
-  也可以通过快捷键清空播放记录，见[绑定快捷键](https://github.com/Koopex/uosc_history_menu/edit/main/README.md#3-keybindings)
+  也可以通过快捷键清空播放记录，见[绑定快捷键](#Keybindings)
 ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/clear-zh.png)
 
 ### 流媒体播放记录
@@ -70,6 +70,7 @@
 controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen',
 ```
 
+<a id="Keybindings"></a>
 ## 3. 绑定快捷键
 
 在`input.conf`中添加以下三行，可以绑定快捷键:
