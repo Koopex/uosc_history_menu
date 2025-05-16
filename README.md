@@ -4,7 +4,7 @@
 
 Adds uosc-based playback history to MPV player.
 
-## Key Features
+## Features
 
 ### 1. Playback History
 
