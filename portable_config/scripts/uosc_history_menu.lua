@@ -34,7 +34,7 @@ if o.language == 'en' then
 		title_deduplicated = 'Recently Played (Deduplicated)',
 		title_folders = 'Recently Played (Folders)',
 		footnote = 'Press ← / → to switch filter modes   Press Ctrl+F to search',
-		clear = 'Clear playback history',
+		clear = 'Clear Playback History',
 		yes = 'YES',
 		no = 'NO',
 		tooltip = 'Recently Played',
