@@ -28,7 +28,7 @@ Open the list, navigate to an entry, and click the delete icon or press ​**Del
 * ​`menu_filter=deduplicated`​: Deletes all records of the selected video.
 * ​`menu_filter=folders`​: Deletes all records in the selected folder.
 
-You can also clear the entire history via a hotkey (see: ​[Keybindings](https://github.com/Koopex/uosc_history_menu?tab=readme-ov-file#3-keybindings​)).
+You can also clear the entire history via a hotkey (see: ​[Keybindings](#Keybindings)).
 ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/clear-en.png)
 
 #### Streaming History
@@ -64,6 +64,7 @@ In uosc's `script-opts`, find the `controls=` section and add `button:history` i
 controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen'
 ```
 
+<a id="Keybindings"></a>
 ### 3. Keybindings
 
 Add these lines to `input.conf` to set hotkeys:
