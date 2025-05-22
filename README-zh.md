@@ -52,8 +52,8 @@
 - 什么也不做`start_action=none`
 
 ## 3. 提示本目录上次播放的视频
-
-通过资源管理器打开视频时，本目录上次播放的视频会被标记。`resume_in_folder=yes`时，打开的不是上次播放的视频会弹出列表并标记。
+`resume_in_folder=yes`
+通过资源管理器打开视频时，询问是否继续播放此文件夹上次播放的视频。
 ![图片](https://github.com/Koopex/uosc_history_menu/blob/main/preview/%E5%90%8C%E7%9B%AE%E5%BD%95%E6%81%A2%E5%A4%8D.gif?raw=true)
 
 # 使用方法
@@ -74,9 +74,9 @@ controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_vide
 在`input.conf`中添加以下三行，可以绑定快捷键:
 
 ```
-SPACE		script-binding uosc_history/resume			#! 继续播放
-r			script-binding uosc_history/toggle_menu		#! 播放记录
-Ctrl+r	script-binding uosc_history/clear			#! 清空播放记录
+SPACE    script-binding uosc_history/resume        #! 继续播放
+r        script-binding uosc_history/toggle_menu   #! 播放记录
+Ctrl+r   script-binding uosc_history/clear          #! 清空播放记录
 ```
 
 按`空格`恢复上次播放,为避免冲突还要把原来的`空格`取消绑定
