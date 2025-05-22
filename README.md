@@ -10,7 +10,7 @@ Adds uosc-based playback history to MPV player.
 
 #### History Filtering
 
-Modify `filter` in `uosc_history_menu.conf` to set the default filtering mode.
+Modify `filter` in `uosc_history.conf` to set the default filtering mode.
 Press **←/→** arrow keys to temporarily switch filtering modes while the list is open.
 
 * ​`filter=all`​: Shows all playback history.
