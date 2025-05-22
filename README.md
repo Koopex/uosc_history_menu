@@ -43,9 +43,10 @@ Press `Space` (or another key) to resume the last played file.
 * Open history menu: `start_action=menu`
 * Do nothing: `start_action=none`
 
-### 3. Highlight Last Played Video in Directory
+### 3. Prompt for the last played file in current folder
 
-When opening a video via file explorer, the last played video in the same directory will be marked. If `resume_in_folder=yes` and the opened video is not the last played one, a list will pop up with the last played entry highlighted.
+`resume_in_folder=yes` 
+When opening a video via file explorer, if the opened video is not the last played one in this folder, it will ask if you want to continue.
 
 ## Usage
 
@@ -65,9 +66,9 @@ controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_vide
 Add these lines to `input.conf` to set hotkeys:
 
 ```
-SPACE		script-binding uosc_history/resume			#! Resume Playback
-r			script-binding uosc_history/toggle_menu		#! Playback History
-Ctrl+r	script-binding uosc_history/clear			#! Clear History
+SPACE    script-binding uosc_history/resume		#! Resume Playback
+r        script-binding uosc_history/toggle_menu	#! Playback History
+Ctrl+r   script-binding uosc_history/clear		#! Clear History
 ```
 
 * ​`Space`: Resumes last playback (disable default Space binding).
