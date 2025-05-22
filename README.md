@@ -31,11 +31,6 @@ Open the list, navigate to an entry, and click the delete icon or press ​**Del
 You can also clear the entire history via a hotkey (see: ​[Keybindings](#Keybindings)).
 ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/clear-en.png)
 
-#### Streaming History
-
-* Disabled by default; enable with `log_url=yes`.
-* For Bilibili, recommended to use with [Play-With-MPV](https://github.com/LuckyPuppy514/external-player) and ​[uosc\_danmaku](https://github.com/Tony15246/uosc_danmaku).
-
 ### 2. Resume Playback
 
 #### Using Hotkeys
@@ -50,7 +45,7 @@ Press `Space` (or another key) to resume the last played file.
 
 ### 3. Highlight Last Played Video in Directory
 
-When opening a video via file explorer, the last played video in the same directory will be marked. If `last_video=yes` and the opened video is not the last played one, a list will pop up with the last played entry highlighted.
+When opening a video via file explorer, the last played video in the same directory will be marked. If `resume_in_folder=yes` and the opened video is not the last played one, a list will pop up with the last played entry highlighted.
 
 ## Usage
 
@@ -76,8 +71,6 @@ Ctrl+r	script-binding uosc_history/clear			#! Clear History
 ```
 
 * ​`Space`: Resumes last playback (disable default Space binding).
-* ​`r`​: Toggles history menu.
-* `Ctrl+r`​: Clears playback history.
 
 ## Credits
 
