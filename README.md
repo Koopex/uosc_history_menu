@@ -1,86 +1,74 @@
 [中文](https://github.com/Koopex/uosc_history_menu/blob/main/README-zh.md)|English
 
-# uosc\_history\_menu
+# uosc_history_menu
 
 Adds uosc-based playback history to MPV player.
 
-## Features
+# Features
 
-### 1. Playback History
+## 1. Playback History
 
-#### History Filtering
+### History Filtering
 
-Modify `filter` in `uosc_history.conf` to set the default filtering mode.
-Press **←/→** arrow keys to temporarily switch filtering modes while the list is open.
+Press ←/→ arrow keys to switch filtering modes while the menu is open.
 
-* ​`filter=all`​: Shows all playback history.
-  ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/all-en.png)
-* ​`filter=dedup`: Shows only the latest record per video.
-  ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/deduplicated-en.png)
-* ​`filter=folders`​: Lists played folders, useful for watching multiple series (if the folder is named like "Season 2," the parent folder will be displayed instead).
-  ![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/folders-en.png)
+| Filtering Modes |Explanation | Hint |
+| --- | --- | --- |
+|All Records| Multiple entries per video, each at different timestamps.| Playback Date & Time |
+| Recent  Media|One entry per video. | Playback Duration / Total Duration |
+| Recent  Folders | One entry per folder. | Watched Videos / Total Videos |
 
-#### Deleting History
+## 2. Resume Playback
 
-Open the list, navigate to an entry, and click the delete icon or press ​**Delete**​. The deletion behavior varies by filtering mode:
+### One-Click Resume
 
-* ​`filter=all`​: Deletes the selected entry.
-* ​`filter=dedup`​: Deletes all records of the selected video.
-* ​`filter=folders`​: Deletes all records in the selected folder.
+Simply press "Play/Pause" when MPV is idle.
 
-You can also clear the entire history via a hotkey (see: ​[Keybindings](#Keybindings)).
-![Preview](https://raw.githubusercontent.com/Koopex/uosc_history_menu/refs/heads/main/preview/clear-en.png)
+### Resume Immediately on Startup
 
-### 2. Resume Playback
+* Requires changing the setting: `start_action=resume`
 
-#### Using Hotkeys
+## 3. Prompt for Last Played Video in the Same Directory
 
-Press `Space` (or another key) to resume the last played file.
+* Requires changing the setting: `resume_in_folder=yes`
 
-#### Actions on MPV Startup
+For example, if you directly open Episode 2 at `~~/TV-show/S01E02.mkv` while a playback record exists for Episode 17 at `~~/TV-show/S01E17.mkv`, a menu will pop up prompting you to resume playback from Episode 17.
 
-* Resume last closed file: `start_action=resume`
-* Open history menu: `start_action=menu`
-* Do nothing: `start_action=none`
+# Usage
 
-### 3. Prompt for the last played file in current folder
+## 1. Install [uosc](https://github.com/tomasklaen/uosc)
 
-`resume_in_folder=yes` 
-When opening a video via file explorer, if the opened video is not the last played one in this folder, it will ask if you want to continue.
+## 2. Add the uosc Button
 
-## Usage
+In uosc's `script-opts`, find a suitable position after `controls=` and add `button:history`:
 
-### 1. Install [uosc]([uosc](https://github.com/tomasklaen/uosc))
-
-### 2. Adding uosc Button
-
-In uosc's `script-opts`, find the `controls=` section and add `button:history` in a suitable position:
 
 ```
-controls='menu,button:history,gap,subtitles,<has_many_audio>audio,<has_many_video>video,<has_many_edition>editions,<stream>stream-quality,gap,space,speed,space,shuffle,loop-playlist,loop-file,gap,prev,items,next,gap,fullscreen'
+controls='menu,button:history,gap...',
 ```
 
 <a id="Keybindings"></a>
-### 3. Keybindings
 
-Add these lines to `input.conf` to set hotkeys:
+## 3. Bind Hotkeys
+
+You can add the following hotkeys to your `input.conf`:
 
 ```
-SPACE    script-binding uosc_history/resume		#! Resume Playback
-r        script-binding uosc_history/toggle_menu	#! Playback History
-Ctrl+r   script-binding uosc_history/clear		#! Clear History
+r               script-binding uosc_history/toggle_menu    #! Playback History
+Ctrl+r          script-binding uosc_history/clear          #! Clear History
+Ctrl+shift+r    script-binding uosc_history/toggle_log     #! Enable/Disable History
 ```
+## 4. Other Settings (Optional)
+Edit `uosc_history.conf`
 
-* ​`Space`: Resumes last playback (disable default Space binding).
+# Credits
 
-## Credits
+Thanks to the following projects for reference!
 
-Special thanks to these projects for inspiration:
-
-* [MPV](https://github.com/mpv-player/mpv)
-* [MPV\_lazy](https://github.com/hooke007/MPV_lazy)
-* [uosc](https://github.com/tomasklaen/uosc)
-* [uosc\_danmaku](https://github.com/Tony15246/uosc_danmaku)
-* [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
-* [Play-With-MPV](https://github.com/LuckyPuppy514/external-player)
+- [mpv](https://github.com/mpv-player/mpv)
+- [mpv\_PlayKit](https://github.com/hooke007/mpv_PlayKit)
+- [uosc](https://github.com/tomasklaen/uosc)
+- [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
+- [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
+- [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
 
