@@ -56,7 +56,7 @@ controls='menu,button:history,gap...',
 ```
 r               script-binding uosc_history/toggle_menu      #! 播放记录
 Ctrl+r          script-binding uosc_history/clear            #! 清空播放记录
-Ctrl+shift+r    script-binding uosc_history/toggle_log       #! 启用/禁用 播放记录
+Ctrl+Alt+r      script-binding uosc_history/toggle_log       #! 启用/禁用 播放记录
 ```
 
 ## 4. 其他设置(可选)
