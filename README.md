@@ -56,7 +56,7 @@ You can add the following hotkeys to your `input.conf`:
 ```
 r               script-binding uosc_history/toggle_menu    #! Playback History
 Ctrl+r          script-binding uosc_history/clear          #! Clear History
-Ctrl+shift+r    script-binding uosc_history/toggle_log     #! Enable/Disable History
+Ctrl+Alt+r      script-binding uosc_history/toggle_log     #! Enable/Disable History
 ```
 ## 4. Other Settings (Optional)
 Edit `uosc_history.conf`
