@@ -15,8 +15,8 @@ Press ←/→ arrow keys to switch filtering modes while the menu is open.
 | Filtering Modes  | Explanation                                              | Hint                               | Delete Record                  |
 | ------------------ | ---------------------------------------------------------- | ------------------------------------ | -------------------------------- |
 | All Records      | Multiple entries per video, each at different timestamps | Playback Date & Time               | Current entry                  |
-| Playback History | One entry per video                                      | Playback Duration / Total Duration | All records for that video     |
-| Folder Records   | One entry per folder                                     | Watched Videos / Total Videos      | All records within that folder |
+| Recent Media | One entry per video                                      | Playback Duration / Total Duration | All records for that video     |
+| Recent Folders   | One entry per folder                                     | Watched Videos / Total Videos      | All records within that folder |
 
 ## 2. Resume Playback
 
