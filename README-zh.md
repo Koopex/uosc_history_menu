@@ -12,11 +12,11 @@
 
 打开列表时可以按方向键←/→切换过滤方式。
 
-|过滤方式 |说明 | 提示信息 |
-| --- | --- | --- |
-|全部记录| 每个视频可有多条不同时间记录 | 播放日期 时间 |
-| 播放记录 | 每个视频一条记录 | 播放时长/总时长 |
-| 文件夹记录 | 每个文件夹一条记录 | 已看视频数/总视频数 |
+|过滤方式 |说明 | 提示信息 |删除记录|
+| --- | --- | --- | --- |
+|全部记录| 每个视频可有多条不同时间记录 | 播放日期 时间 |当前记录|
+| 播放记录 | 每个视频一条记录 | 播放时长/总时长 |该视频的全部记录|
+| 文件夹记录 | 每个文件夹一条记录 | 已看视频数/总视频数 |该文件夹内所有视频的记录|
 
 ## 2. 恢复播放
 
@@ -28,7 +28,15 @@
 
 - 需修改设置: `start_action=resume`
 
-## 3. 提示同目录上次播放的视频
+## 3. 书签
+
+可以从播放记录或当前播放文件添加书签
+
+支持对书签重命名, 排序和删除
+
+- 只能通过按键排序: 上移`Ctrl+Up/PgUp/Home`,     下移`Ctrl+Down/PgDn/End`
+
+## 4. 提示同目录上次播放的视频
 
 - 需修改设置: `resume_in_folder=yes`
 
@@ -47,6 +55,14 @@
 controls='menu,button:history,gap...',
 ```
 
+可用的按钮:
+
+```
+button:history             播放记录
+button:bookmarks           书签
+button:add_bookmarks       添加书签
+```
+
 <a id="Keybindings"></a>
 
 ## 3. 绑定快捷键
@@ -54,9 +70,12 @@ controls='menu,button:history,gap...',
 在你的`input.conf`中可添加以下快捷键:
 
 ```
-r               script-binding uosc_history/toggle_menu      #! 播放记录
-Ctrl+r          script-binding uosc_history/clear            #! 清空播放记录
-Ctrl+Alt+r      script-binding uosc_history/toggle_log       #! 启用/禁用 播放记录
+e		      script-binding uosc_history/bookmarks	        #! 书签
+Ctrl+e		  script-binding uosc_history/add_bookmarks	    #! 添加书签
+Ctrl+Alt+e	  script-binding uosc_history/clear_bookmarks	#! 清空书签		    				
+r		      script-binding uosc_history/history	        #! 播放记录                         
+Ctrl+r		  script-binding uosc_history/enable_history	#! 启用/禁用 播放记录
+Ctrl+Alt+r    script-binding uosc_history/clear_history	    #! 清空播放记录
 ```
 
 ## 4. 其他设置(可选)
@@ -73,3 +92,4 @@ Ctrl+Alt+r      script-binding uosc_history/toggle_log       #! 启用/禁用 �
 - [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
 - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
 - [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
+  
