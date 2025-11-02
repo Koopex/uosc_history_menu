@@ -12,11 +12,11 @@ Adds uosc-based playback history to MPV player.
 
 Press ←/→ arrow keys to switch filtering modes while the menu is open.
 
-| Filtering Modes |Explanation | Hint |
-| --- | --- | --- |
-|All Records| Multiple entries per video, each at different timestamps.| Playback Date & Time |
-| Recent  Media|One entry per video. | Playback Duration / Total Duration |
-| Recent  Folders | One entry per folder. | Watched Videos / Total Videos |
+| Filtering Modes  | Explanation                                              | Hint                               | Delete Record                  |
+| ------------------ | ---------------------------------------------------------- | ------------------------------------ | -------------------------------- |
+| All Records      | Multiple entries per video, each at different timestamps | Playback Date & Time               | Current entry                  |
+| Playback History | One entry per video                                      | Playback Duration / Total Duration | All records for that video     |
+| Folder Records   | One entry per folder                                     | Watched Videos / Total Videos      | All records within that folder |
 
 ## 2. Resume Playback
 
@@ -28,7 +28,15 @@ Simply press "Play/Pause" when MPV is idle.
 
 * Requires changing the setting: `start_action=resume`
 
-## 3. Prompt for Last Played Video in the Same Directory
+## 3. Bookmarks
+
+Add bookmarks from playback history or currently playing file.
+
+Supports renaming, sorting, and deleting bookmarks.
+
+* Sort only via hotkeys: Move up `Ctrl+Up/PgUp/Home`, Move down `Ctrl+Down/PgDn/End`
+
+## 4. Prompt for Last Played Video in the Same Directory
 
 * Requires changing the setting: `resume_in_folder=yes`
 
@@ -42,11 +50,17 @@ For example, if you directly open Episode 2 at `~~/TV-show/S01E02.mkv` while a p
 
 In uosc's `script-opts`, find a suitable position after `controls=` and add `button:history`:
 
-
 ```
 controls='menu,button:history,gap...',
 ```
 
+Available buttons:
+
+```
+button:history             Playback History
+button:bookmarks           Bookmarks  
+button:add_bookmarks       Add Bookmark
+```
 <a id="Keybindings"></a>
 
 ## 3. Bind Hotkeys
@@ -54,11 +68,16 @@ controls='menu,button:history,gap...',
 You can add the following hotkeys to your `input.conf`:
 
 ```
-r               script-binding uosc_history/toggle_menu    #! Playback History
-Ctrl+r          script-binding uosc_history/clear          #! Clear History
-Ctrl+Alt+r      script-binding uosc_history/toggle_log     #! Enable/Disable History
+e               script-binding uosc_history/bookmarks          #! Bookmarks
+Ctrl+e          script-binding uosc_history/add_bookmarks      #! Add Bookmark
+Ctrl+Alt+e      script-binding uosc_history/clear_bookmarks    #! Clear Bookmarks                   
+r               script-binding uosc_history/history            #! Playback History                        
+Ctrl+r          script-binding uosc_history/enable_history     #! Enable/Disable History
+Ctrl+Alt+r      script-binding uosc_history/clear_history      #! Clear History
 ```
+
 ## 4. Other Settings (Optional)
+
 Edit `uosc_history.conf`
 
 # Credits
@@ -71,4 +90,3 @@ Thanks to the following projects for reference!
 - [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
 - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
 - [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
-
