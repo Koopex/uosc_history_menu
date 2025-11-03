@@ -729,9 +729,7 @@ end)
 mp.register_event('end-file', function()
 	if state.logable then
 		writeLog()
-		if mp.get_property_bool('idle-active', 'false') then
-			readLog()
-		end
+		readLog()
 		state.logable = false
 	end
 	state.resumable = false
