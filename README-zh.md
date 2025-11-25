@@ -47,7 +47,14 @@
 
 ## 1. 安装[uosc](https://github.com/tomasklaen/uosc)
 
-## 2. 添加uosc按钮
+## 2. 安装本插件
+
+将`uosc_history.lua`放入你的`scripts`文件夹
+
+编辑`uosc_history.conf`并放入你的`script-opts`文件夹
+
+
+## 3. 添加uosc按钮
 
 在uosc的script-opts中，在`controls=`后面找到合适的位置添加`button:history`：
 
@@ -57,15 +64,13 @@ controls='menu,button:history,gap...',
 
 可用的按钮:
 
-```
-button:history             播放记录
-button:bookmarks           书签
-button:add_bookmarks       添加书签
-```
+ - `button:history`: 播放记录
+ - `button:bookmarks`: 书签
+ - `button:add_bookmarks`: 添加书签
 
 <a id="Keybindings"></a>
 
-## 3. 绑定快捷键
+## 4. 绑定快捷键
 
 在你的`input.conf`中可添加以下快捷键:
 
@@ -78,9 +83,6 @@ Ctrl+r		  script-binding uosc_history/enable_history	#! 启用/禁用 播放记�
 Ctrl+Alt+r    script-binding uosc_history/clear_history	    #! 清空播放记录
 ```
 
-## 4. 其他设置(可选)
-
-修改`uosc_history.conf`
 
 # 感谢!
 
