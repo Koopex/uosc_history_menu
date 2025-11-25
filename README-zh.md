@@ -56,7 +56,7 @@
 
 ## 3. 添加uosc按钮
 
-在uosc的script-opts中，在`controls=`后面找到合适的位置添加`button:history`：
+编辑`uosc.conf`，在`controls=`后面找到合适的位置添加`button:history`：
 
 ```
 controls='menu,button:history,gap...',
