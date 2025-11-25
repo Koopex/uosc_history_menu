@@ -46,9 +46,15 @@ For example, if you directly open Episode 2 at `~~/TV-show/S01E02.mkv` while a p
 
 ## 1. Install [uosc](https://github.com/tomasklaen/uosc)
 
-## 2. Add the uosc Button
+## 2. Install this script
 
-In uosc's `script-opts`, find a suitable position after `controls=` and add `button:history`:
+Place `uosc_history.lua` in your mpv `scripts` folder
+
+Edit `uosc_history.conf` and place it in your mpv `script-opts` folder
+
+## 3. Add the uosc Button
+
+Edit `uosc.conf`, find a suitable position after `controls=` and add `button:history`:
 
 ```
 controls='menu,button:history,gap...',
@@ -56,14 +62,13 @@ controls='menu,button:history,gap...',
 
 Available buttons:
 
-```
-button:history             Playback History
-button:bookmarks           Bookmarks  
-button:add_bookmarks       Add Bookmark
-```
+ - `button:history`: Playback History
+ - `button:bookmarks`: Bookmarks  
+ - `button:add_bookmarks`: Add Bookmark
+
 <a id="Keybindings"></a>
 
-## 3. Bind Hotkeys
+## 4. Bind Hotkeys
 
 You can add the following hotkeys to your `input.conf`:
 
@@ -76,9 +81,6 @@ Ctrl+r          script-binding uosc_history/enable_history     #! Enable/Disable
 Ctrl+Alt+r      script-binding uosc_history/clear_history      #! Clear History
 ```
 
-## 4. Other Settings (Optional)
-
-Edit `uosc_history.conf`
 
 # Credits
 
