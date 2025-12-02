@@ -2,7 +2,7 @@
 
 # uosc_history_menu
 
-Adds uosc-based playback history to mpv player.
+Adds [uosc](https://github.com/tomasklaen/uosc)-based playback history to mpv player.
 
 # Features
 
@@ -91,4 +91,4 @@ Thanks to the following projects for reference!
 - [uosc](https://github.com/tomasklaen/uosc)
 - [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
 - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
-- [外部播放器(Play-With-mpv)](https://github.com/LuckyPuppy514/external-player)
+- [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
