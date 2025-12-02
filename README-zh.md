@@ -2,7 +2,7 @@
 
 # uosc_history_menu
 
-在MPV播放器中添加基于uosc的播放记录。
+在 mpv 播放器中添加基于 [uosc](https://github.com/tomasklaen/uosc) 的播放记录。
 
 # 主要功能
 
