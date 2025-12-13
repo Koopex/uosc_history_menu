@@ -35,6 +35,8 @@ Add bookmarks from playback history or currently playing file.
 Supports renaming, sorting, and deleting bookmarks.
 
 * Sort only via hotkeys: Move up `Ctrl+Up/PgUp/Home`, Move down `Ctrl+Down/PgDn/End`
+* Renaming a group can only be done using the shortcut key: `Left Arrow (←)` ; Delete a group with  the shortcut key `Delete`.
+* Renaming an individual favorite can be done either by clicking the `button` or using the shortcut key: `Right Arrow (→)`.
 
 ## 4. Prompt for Last Played Video in the Same Directory
 
