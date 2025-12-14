@@ -1,4 +1,4 @@
-[中文](https://github.com/Koopex/uosc_history_menu/blob/main/README-zh.md)|English
+[![Static Badge](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-blue)](./README-zh.md)
 
 # uosc_history_menu
 
