@@ -24,7 +24,7 @@ When the list is open, you can quickly switch filtering modes using the `Left/Ri
 
 - **Auto-Resume on Startup**: After setting `start_action=resume` in the configuration file, mpv will automatically resume the last video upon startup.
 
-- **Resume in Same Folder**: After setting `resume_in_folder=yes` in the configuration file, when you open a video in a folder, if there are other video records in the same folder, the plugin will pop up a menu asking if you want to jump to resume playback.
+- **Resume in Same Folder**: After setting `resume_in_folder=yes` in the configuration file, when you open a video in a folder, if there are other video records in the same folder, the script will pop up a menu asking if you want to jump to resume playback.
 
 ## 3. Bookmark Management
 
