@@ -1,8 +1,8 @@
-[![Static Badge](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-blue)](./README-zh.md)
+[![Static Badge](https://img.shields.io/badge/README-简体中文-red)](./README.zh-CN.md)
 
 # uosc_history_menu
 
-Adds [uosc](https://github.com/tomasklaen/uosc)-based playback history to mpv player.
+Adds a playback history and bookmark management menu integrated with [uosc](https://github.com/tomasklaen/uosc) for mpv.
 
 # Features
 
@@ -10,51 +10,44 @@ Adds [uosc](https://github.com/tomasklaen/uosc)-based playback history to mpv pl
 
 ### History Filtering
 
-Press ←/→ arrow keys to switch filtering modes while the menu is open.
+When the list is open, you can quickly switch filtering modes using the `Left/Right Arrow Keys`.
 
-| Filtering Modes  | Explanation                                              | Hint                               | Delete Record                  |
-| ------------------ | ---------------------------------------------------------- | ------------------------------------ | -------------------------------- |
-| All Records      | Multiple entries per video, each at different timestamps | Playback Date & Time               | Current entry                  |
-| Recent Media | One entry per video                                      | Playback Duration / Total Duration | All records for that video     |
-| Recent Folders   | One entry per folder                                     | Watched Videos / Total Videos      | All records within that folder |
+| Filtering Mode | Description | Hint Information | Effect of Delete Operation |
+| --- | --- | --- | --- |
+| All Records | A video may have multiple entries at different progress points. | Playback Date & Time | Deletes only the **single selected record** |
+| Recent Media | Shows only the **latest record for each video**. | Playback Duration / Total Duration | Deletes **all history records for that video** |
+| Recent Folders | Shows **one latest record per folder**. | Watched Videos / Total Videos in Folder | Deletes records for **all videos within that folder** |
 
 ## 2. Resume Playback
 
-### One-Click Resume
+- **One-Click Resume**: When mpv is in an **idle state** (no file loaded), press the **Play/Pause key** to directly resume the last watched video.
 
-Simply press "Play/Pause" when mpv is idle.
+- **Auto-Resume on Startup**: After setting `start_action=resume` in the configuration file, mpv will automatically resume the last video upon startup.
 
-### Resume Immediately on Startup
+- **Resume in Same Folder**: After setting `resume_in_folder=yes` in the configuration file, when you open a video in a folder, if there are other video records in the same folder, the plugin will pop up a menu asking if you want to jump to resume playback.
 
-* Requires changing the setting: `start_action=resume`
+## 3. Bookmark Management
 
-## 3. Bookmarks
+You can add any history record or currently playing video as a bookmark and manage them.
 
-Add bookmarks from playback history or currently playing file.
-
-Supports renaming, sorting, and deleting bookmarks.
-
-* Sort only via hotkeys: Move up `Ctrl+Up/PgUp/Home`, Move down `Ctrl+Down/PgDn/End`
-* Renaming a group can only be done using the shortcut key: `Left Arrow (←)` ; Delete a group with  the shortcut key `Delete`.
-* Renaming an individual favorite can be done either by clicking the `button` or using the shortcut key: `Right Arrow (→)`.
-
-## 4. Prompt for Last Played Video in the Same Directory
-
-* Requires changing the setting: `resume_in_folder=yes`
-
-For example, if you directly open Episode 2 at `~~/TV-show/S01E02.mkv` while a playback record exists for Episode 17 at `~~/TV-show/S01E17.mkv`, a menu will pop up prompting you to resume playback from Episode 17.
+| Operation | Group | Bookmark Item |
+| --- | --- | --- |
+| Delete | Can only use shortcut `Del` | Shortcut or button |
+| Sort | Move Up: `Ctrl+Up/PgUp/Home`, Move Down: `Ctrl+Down/PgDn/End` | Same as left |
+| Rename | Can only use shortcut `Left Arrow` | `Right Arrow` or button |
+| Change Group | - | Button |
 
 # Usage
 
 ## 1. Install [uosc](https://github.com/tomasklaen/uosc)
 
-## 2. Install this script
+## 2. Install This Script
 
-Place `uosc_history.lua` in your mpv `scripts` folder
+Place `uosc_history.lua` in your `scripts` folder.
 
-Edit `uosc_history.conf` and place it in your mpv `script-opts` folder
+Edit `uosc_history.conf` and place it in your `script-opts` folder.
 
-## 3. Add the uosc Button
+## 3. Add uosc Button
 
 Edit `uosc.conf`, find a suitable position after `controls=` and add `button:history`:
 
@@ -85,7 +78,7 @@ Ctrl+Alt+r      script-binding uosc_history/clear_history      #! Clear History
 
 ---  
 
-## Reference:  
+## Credits & References:
 
 - [uosc](https://github.com/tomasklaen/uosc)
 - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
