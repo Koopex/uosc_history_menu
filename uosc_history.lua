@@ -1,5 +1,5 @@
 -- https://github.com/Koopex/uosc_history_menu
--- version: 2.3.1
+-- version: 2.3.2
 
 --=================================[ 脚本设置 | Script Settings ]===================================
 local o ={ 
@@ -25,6 +25,11 @@ local o ={
 	-- <true>	文件名		| Filename
 	-- <false>	媒体标题	| Media title
 	filename = false,
+
+	--------[ 搜索结果排序 | Sort search results ]---------
+	-- <true>	搜索结果按播放时间排序	| Search results sorted by playback time
+	-- <false>	uosc 默认的搜索结果		| Default results provided by uosc
+	search_sorting = true,
 
 	--------------[ 记录文件路径 | Log path ]--------------
 	-- ~~home 表示mpv.conf所在文件夹
@@ -94,6 +99,7 @@ local t = o.language == 'zh' and {
 	log_disabled = '播放记录: 禁用',
 	live = '直播',
 	unknown = '未知', 
+	search_results = '搜索结果',
 	} or {
 	del = 'Delete this record',
 	title_all = 'All Records',
@@ -129,6 +135,7 @@ local t = o.language == 'zh' and {
 	log_disabled = 'Playback history logging disabled',
 	live = 'Live',
 	unknown = 'Unknown',
+	search_results = 'Search Results',
 }
 
 local buttons = {
@@ -156,11 +163,10 @@ local buttons = {
 			command = 'script-binding uosc_history/add_bookmarks'
 		}
 	},
-
 }
 
-local options, entries, all, dedup, folders, new, bookmark_entries, bookmark_items, new_bookmark
-= {log = true, filter = 'dedup'}, {}, {}, {}, {}, {}, {}, {}, {}
+local options, entries, all, dedup, folders, new, bookmark_entries, bookmark_items, new_bookmark, results
+= {log = true, filter = 'dedup'}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 local state ={
 	-- 指示: 是否读取过日志
@@ -178,8 +184,10 @@ local state ={
 	pending_rename = nil, 
 	-- 用于: 清空条目
 	clear_type = nil, 
-	-- 用于: 在播放记录菜单中添加收藏以后回到播放记录菜单
+	-- 用于: 在播放记录菜单中添加收藏以后回到播放记录菜单或搜索结果菜单
 	menu_index_after_mark = nil,
+	-- 用于: 在播放记录菜单中添加收藏以后回到搜索结果菜单
+	back_to_result = nil,
 	-- 用于: 判断选择书签文件夹以后是否成功加入, 使用前先设为nil
 	delete_after_inserted = nil,
 }
@@ -709,6 +717,7 @@ local function openMenu(num, update)
 
 	local menu_props = {
 		type = 'history',
+		id = options.filter,
 		title = title,
 		selected_index = num,
 		items = items,
@@ -716,6 +725,12 @@ local function openMenu(num, update)
 		footnote = t.footnote,
 		callback = {script_name, 'history_menu_event'},
 	}
+
+	if o.search_sorting then
+		menu_props.on_search = 'callback'
+		menu_props.search_debounce = 'submit'
+	end 
+
 	if update then
 		mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(menu_props))
 	else
@@ -739,12 +754,46 @@ local function toggleMenu()
 	end
 end
 
+local function openResultMenu(index)
+	local title
+	if options.filter == 'all' then
+		title = string.format('%s - %s(%d)', t.title_all, t.search_results, #results)
+	elseif options.filter == 'dedup' then
+		title = string.format('%s - %s(%d)', t.title_dedup, t.search_results, #results)
+	elseif options.filter == 'folders' then
+		title = string.format('%s - %s(%d)', t.title_folders, t.search_results, #results)
+	end 
+
+	local menu_props = {
+		type = 'history',
+		id = 'search_menu',
+		title = title,
+		items = results,
+		selected_index = index,
+		item_actions = {{name = 'mark', icon = 'star', label = t.bookmark_add}},
+		on_search = 'callback',
+		search_debounce = 'submit',
+		callback = {script_name, 'history_menu_event'},
+	}
+
+	mp.commandv(
+		'script-message-to', 'uosc', 
+		mp.get_property_native('user-data/uosc/menu/id') == menu_props.id 
+		and 'update-menu' or 'open-menu', utils.format_json(menu_props)
+	)
+end 
+
 local function insertBookmarkEntries(folder_index, new_folder)
 	if not new_bookmark then return end
 
 	local function closeOrBack(index)
 		if state.menu_index_after_mark then 
-			openMenu(state.menu_index_after_mark) 
+			if state.back_to_result then
+				openResultMenu(state.menu_index_after_mark)
+				state.back_to_result = nil
+			else
+				openMenu(state.menu_index_after_mark) 
+			end
 			state.menu_index_after_mark = nil
 		else
 			local submenu_id = folder_index and bookmark_entries[folder_index].title or new_folder
@@ -848,6 +897,7 @@ local function renameType(menu_id, index)
 	state.pending_rename = {index = index}
 	if menu_id == 'bookmarks' then
 		state.pending_rename.folder = true
+		-- menu_props.search_suggestion = bookmark_entries[index].title
 	else
 		for i,v in ipairs(bookmark_entries) do
 			if v.title == menu_id then 
@@ -930,6 +980,48 @@ local function endFile()
 	mp.observe_property('pause', 'bool', observePause)
 end 
 
+local function searchHistory(menu_id, query)
+    local keywords = {}
+	query = string.lower(query)
+    for word in string.gmatch(query, "[^%s]+") do
+        if word ~= "" then
+            table.insert(keywords, word)
+        end
+    end
+	if #keywords == 0 then return end
+
+	local function findWords(str)
+		str = string.lower(str)
+		for _, keyword in ipairs(keywords) do
+			local found = false
+			-- 支持简单的通配符*（匹配任意字符）
+			local regex = string.gsub(keyword, "%*", ".*")
+			found = string.match(str, regex) ~= nil
+			if not found then return false end
+		end
+		return true
+	end
+
+	results = {}
+	local items
+	if options.filter == 'all' then
+		items = all
+	elseif options.filter == 'dedup' then
+		items = dedup
+	elseif options.filter == 'folders' then
+		items = folders
+	end 
+
+	for _,v in ipairs(items) do
+		if findWords(v.title) then 
+			table.insert(results, v)
+		end
+	end
+	if #results == 0 then return end
+
+	openResultMenu()
+end
+
 local function historyMenuEvent(json) 
 	local event = utils.parse_json(json)
 	if event.type == 'activate' then
@@ -938,10 +1030,15 @@ local function historyMenuEvent(json)
 			deleteHistoryEntries(event.value.peers, event.index)
 		elseif event.action == 'mark' then
 			local title
-			if options.filter == 'all' then
-				title = entries[event.index].media_title
-			else
-				title = entries[event.value.peers[1]].media_title
+			if event.menu_id == 'search_menu' then 
+				title = results[event.index].title
+				state.back_to_result = true
+			else 
+				if options.filter == 'all' then
+					title = entries[event.index].media_title
+				else
+					title = entries[event.value.peers[1]].media_title
+				end
 			end
 			new_bookmark = {
 				title = title,
@@ -970,6 +1067,8 @@ local function historyMenuEvent(json)
 			-- 按键删除条目
 			deleteHistoryEntries(event.selected_item.value.peers, event.selected_item.index)
 		end
+	elseif event.type == 'search' then
+		searchHistory(event.menu_id, event.query)
 	end
 end
 
