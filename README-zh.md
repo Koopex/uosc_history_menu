@@ -86,14 +86,13 @@ Ctrl+Alt+r    script-binding uosc_history/clear_history	    #! 清空播放记�
 ```
 
 
-# 感谢!
+--- 
 
-感谢以下项目提供参考!
-
-- [mpv](https://github.com/mpv-player/mpv)
-- [mpv\_PlayKit](https://github.com/hooke007/mpv_PlayKit)
+## 参考了以下项目:  
 - [uosc](https://github.com/tomasklaen/uosc)
-- [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
 - [SimpleHistory](https://github.com/dyphire/Eisa01_mpv-scripts/blob/dev/scripts/simplehistory.lua)
-- [外部播放器(Play-With-MPV)](https://github.com/LuckyPuppy514/external-player)
+- [history-bookmark.lua](https://github.com/yuukidach/mpv-scripts/blob/master/README.zh-CN.md#history-bookmarklua)
+- [uosc_danmaku](https://github.com/Tony15246/uosc_danmaku)
+- [mpv\_PlayKit](https://github.com/hooke007/mpv_PlayKit)
+
   
