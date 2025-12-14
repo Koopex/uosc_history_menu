@@ -1,4 +1,4 @@
-[![Static Badge](https://img.shields.io/badge/README-简体中文-red)](./README.zh-CN.md)
+[![Static Badge](https://img.shields.io/badge/README-简体中文-red)](./README-zh.md)
 
 # uosc_history_menu
 
