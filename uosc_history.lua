@@ -1,5 +1,5 @@
 -- https://github.com/Koopex/uosc_history_menu
--- version: 2.3.0
+-- version: 2.3.1
 
 --=================================[ 脚本设置 | Script Settings ]===================================
 local o ={ 
@@ -13,12 +13,20 @@ local o ={
 	-- <none>	什么也不做			| None
 	start_action = 'none',
 
-	--[ 提示本目录上次播放的视频 | Remind the last played media in current folder]--
+	--------[ 文件夹续播 | Resume in Same Folder ]--------
+	--[[当你打开某文件夹中的一个视频时，如果同文件夹内有其他视频记录，插件会弹出菜单询问你是否跳转续播]]
+	--[[ When you open a video in a folder, if there are other video records in the same folder, 
+	the script will pop up a menu asking if you want to jump to resume playback.]]
 	-- <true>
 	-- <false>
 	resume_in_folder = false,
 
-	------------[ 记录文件路径 | Log path ]----------
+	--------------[ 条目标题 | Entry Title ]---------------
+	-- <true>	文件名		| Filename
+	-- <false>	媒体标题	| Media title
+	filename = false,
+
+	--------------[ 记录文件路径 | Log path ]--------------
 	-- ~~home 表示mpv.conf所在文件夹
 	-- ~~home is the mpv config directory
 	log_path = '~~home/uosc_history.json',
@@ -151,7 +159,7 @@ local buttons = {
 
 }
 
-local options, bookmark_entries, bookmark_items, new_bookmark, entries, all, dedup, folders, new
+local options, entries, all, dedup, folders, new, bookmark_entries, bookmark_items, new_bookmark
 = {log = true, filter = 'dedup'}, {}, {}, {}, {}, {}, {}, {}, {}
 
 local state ={
@@ -193,13 +201,14 @@ end
 local function selectBookmarkFolder()
 	local folders = {}
 	folders[1] = {
-		title = '➕ '..t.create_bookmark_folder,
+		title = string.format('📁 %s',t.create_bookmark_folder),
 		value = {
 			new_folder = true,
 			folder_index = true,
 		},
-		-- align = 'center',
+		align = 'center',
 		separator = true,
+		-- italic = true,
 	}
 
 	for i,v in ipairs(bookmark_entries) do
@@ -395,8 +404,14 @@ local function getItems()
 				all[i].dedup_index = seen_path[entry.path] -- for resumeInFolder()
 			end
 		else	
+			local title
+			if o.filename then
+				_,title = utils.split_path(entry.path) 
+			else 
+				title = entry.media_title
+			end
 			table.insert(all, {
-				title = entry.media_title,
+				title = title,
 				hint = entry.datetime,
 				-- icon =  '',
 				value = {
@@ -406,7 +421,7 @@ local function getItems()
 			})
 			if not seen_path[entry.path] then
 				table.insert(dedup,{						
-					title = entry.media_title,
+					title = title,
 					hint = entry.progress,
 					-- icon =  '',
 					value = {
@@ -493,7 +508,7 @@ local function getNewEntry()
 				mp.unobserve_property(ob_duration)
 			end
 			twice = true
-			mp.add_timeout(0.5, function() mp.unobserve_property(ob_duration) end)
+			mp.add_timeout(3, function() mp.unobserve_property(ob_duration) end)
 		end
 		mp.observe_property('duration','number' ,ob_duration)
 		return
