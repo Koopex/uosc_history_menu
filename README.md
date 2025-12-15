@@ -10,7 +10,7 @@ Adds a playback history and bookmark management menu integrated with [uosc](http
 
 ### History Filtering
 
-When the list is open, you can quickly switch filtering modes using the `Left/Right Arrow Keys`.
+When the list is open, you can quickly switch **filtering modes** using the `Left/Right Arrow Keys`.
 
 | Filtering Mode | Description | Hint Information | Effect of Delete Operation |
 | --- | --- | --- | --- |
@@ -28,15 +28,15 @@ When the list is open, you can quickly switch filtering modes using the `Left/Ri
 
 ## 3. Bookmark Management
 
-- You can add any history record or currently playing video as a bookmark and manage them.
-- Quick bookmark mode: Add bookmarks directly to the default bookmark group without group selection. Toggle with the hotkey `script-binding uosc_history/toggle_quick_mark`.
-
-| Operation | Group | Bookmark Item |
-| --- | --- | --- |
-| Delete | Can only use shortcut `Del` | Shortcut or button |
-| Sort | Move Up: `Ctrl+Up/PgUp/Home`, Move Down: `Ctrl+Down/PgDn/End` | Same as left |
-| Rename | Can only use shortcut `Left Arrow` | `Right Arrow` or button |
-| Change Group | - | Button |
+- You can add any **history record** or **currently playing video** as a bookmark and manage them.
+  - **Quick bookmark mode**: Add bookmarks directly to the default bookmark group without group selection. Toggle with the hotkey `script-binding uosc_history/toggle_quick_mark`.
+- Other operations:
+  || Group | Bookmark Item |
+  | --- | --- | --- |
+  | Delete | Can only use shortcut `Del` | Shortcut or button |
+  | Sort | Move Up: `Ctrl+Up/PgUp/Home`<br>Move Down: `Ctrl+Down/PgDn/End` | Same as left |
+  | Rename | Can only use shortcut `Left Arrow` | `Right Arrow` or button |
+  | Change Group | - | Button |
 
 # Usage
 
