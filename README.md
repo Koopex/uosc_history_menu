@@ -28,9 +28,9 @@ When the list is open, you can quickly switch **filtering modes** using the `Lef
 
 ## 3. Bookmark Management
 
-- You can add any **history record** or **currently playing video** as a bookmark and manage them.
+- **Add bookmark**: You can add any **history record** or **currently playing video** as a bookmark and manage them.
   - **Quick bookmark mode**: Add bookmarks directly to the default bookmark group without group selection. Toggle with the hotkey `script-binding uosc_history/toggle_quick_mark`.
-- Other operations:
+- **Other operations**:
   || Group | Bookmark Item |
   | --- | --- | --- |
   | Delete | Can only use shortcut `Del` | Shortcut or button |
