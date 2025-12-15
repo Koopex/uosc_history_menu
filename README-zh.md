@@ -30,14 +30,15 @@
 
 ## 3. 收藏夹管理
 
-你可以将任意历史记录或当前正在播放的视频添加为书签，并对其进行管理。  
-
-|操作|分组|收藏项| 
-| --- | --- | --- |
-|删除|只能使用快捷键 `Del`|快捷键或按钮|
-|排序|上移：`Ctrl+Up/PgUp/Home`，下移 `Ctrl+Down/PgDn/End`|同左|
-|重命名|只能使用快捷键 `←方向键`| `→方向键`或按钮|
-|改变分组|-|按钮|
+- 添加收藏: 你可以将任意历史记录或当前正在播放的视频添加为书签，并对其进行管理。
+  - 快速收藏模式: 直接添加到默认的收藏夹, 不需要选收藏夹, 使用快捷键 `script-binding uosc_history/toggle_quick_mark` 切换
+- 其他操作: 
+  ||分组|收藏项| 
+  | --- | --- | --- |
+  |删除|只能使用快捷键 `Del`|快捷键或按钮|
+  |排序|上移：`Ctrl+Up/PgUp/Home`，下移 `Ctrl+Down/PgDn/End`|同左|
+  |重命名|只能使用快捷键 `←方向键`| `→方向键`或按钮|
+  |改变分组|-|按钮|
 
 # 使用方法
 
@@ -71,12 +72,14 @@ controls='menu,button:history,gap...',
 在你的`input.conf`中可添加以下快捷键:
 
 ```
-e		      script-binding uosc_history/bookmarks	        #! 书签
-Ctrl+e		  script-binding uosc_history/add_bookmarks	    #! 添加书签
-Ctrl+Alt+e	  script-binding uosc_history/clear_bookmarks	#! 清空书签		    				
-r		      script-binding uosc_history/history	        #! 播放记录                         
-Ctrl+r		  script-binding uosc_history/enable_history	#! 启用/禁用 播放记录
-Ctrl+Alt+r    script-binding uosc_history/clear_history	    #! 清空播放记录
+r				script-binding uosc_history/history				#! 播放记录
+Alt+r			script-binding uosc_history/enable_history		#! 禁用 播放记录
+Ctrl+Alt+r		script-binding uosc_history/clear_history		#! 清空播放记录
+
+d				script-binding uosc_history/bookmarks			#! 收藏夹
+Ctrl+d			script-binding uosc_history/add_bookmarks		#! 添加收藏
+Alt+d			script-binding uosc_history/toggle_quick_mark	#! 切换快速收藏模式
+Ctrl+Alt+d		script-binding uosc_history/clear_bookmarks		#! 清空收藏夹
 ```
 
 
