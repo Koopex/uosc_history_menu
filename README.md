@@ -28,7 +28,8 @@ When the list is open, you can quickly switch filtering modes using the `Left/Ri
 
 ## 3. Bookmark Management
 
-You can add any history record or currently playing video as a bookmark and manage them.
+- You can add any history record or currently playing video as a bookmark and manage them.
+- Quick bookmark mode: Add bookmarks directly to the default bookmark group without group selection. Toggle with the hotkey `script-binding uosc_history/toggle_quick_mark`.
 
 | Operation | Group | Bookmark Item |
 | --- | --- | --- |
@@ -68,12 +69,14 @@ Available buttons:
 You can add the following hotkeys to your `input.conf`:
 
 ```
-e               script-binding uosc_history/bookmarks          #! Bookmarks
-Ctrl+e          script-binding uosc_history/add_bookmarks      #! Add Bookmark
-Ctrl+Alt+e      script-binding uosc_history/clear_bookmarks    #! Clear Bookmarks                   
-r               script-binding uosc_history/history            #! Playback History                        
-Ctrl+r          script-binding uosc_history/enable_history     #! Enable/Disable History
-Ctrl+Alt+r      script-binding uosc_history/clear_history      #! Clear History
+r			script-binding uosc_history/history				#! Playback History
+Ctrl+r		script-binding uosc_history/enable_history		#! Disable History
+Ctrl+Alt+r	script-binding uosc_history/clear_history		#! Clear History
+
+d			script-binding uosc_history/bookmarks			#! Bookmarks
+Ctrl+d		script-binding uosc_history/add_bookmarks		#! Add Bookmarks
+Alt+d		script-binding uosc_history/toggle_quick_mark	#! Switch Quick Bookmark Mode
+Ctrl+Alt+d	script-binding uosc_history/clear_bookmarks		#! Clear Bookmarks	
 ```
 
 ---  
