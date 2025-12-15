@@ -26,27 +26,29 @@ local o ={
 	-- <false>	媒体标题	| Media title
 	filename = false,
 
-	--------[ 搜索结果排序 | Sort search results ]---------
+	--------[ 搜索结果排序 | Sort Search Results ]---------
 	-- <true>	搜索结果按播放时间排序	| Search results sorted by playback time
 	-- <false>	uosc 默认的搜索结果		| Default results provided by uosc
-	search_sorting = true,
+	search_sorting = false,
 
-	--------------[ 记录文件路径 | Log path ]--------------
+	--------------[ 记录文件路径 | Log Path ]--------------
 	-- ~~home 表示mpv.conf所在文件夹
 	-- ~~home is the mpv config directory
 	log_path = '~~home/uosc_history.json',
 }--[[ 
 --------------------------------------[ 快捷键 |  Shortcuts ]--------------------------------------
-e			script-binding uosc_history/bookmarks	        #! 收藏夹			| Bookmarks			
-Ctrl+e		script-binding uosc_history/add_bookmarks		#! 添加收藏			| Add Bookmarks				
-Ctrl+Alt+e	script-binding uosc_history/clear_bookmarks		#! 清空收藏夹	    | Clear Bookmarks			
-r			script-binding uosc_history/history	            #! 播放记录         | Playback History            
-Ctrl+r		script-binding uosc_history/enable_history      #! 禁用 播放记录	| Disable History												
-Ctrl+Alt+r  script-binding uosc_history/clear_history	    #! 清空播放记录		| Clear History
+r			script-binding uosc_history/history				#! 播放记录			| Playback History
+Alt+r		script-binding uosc_history/enable_history		#! 禁用 播放记录	| Disable History
+Ctrl+Alt+r	script-binding uosc_history/clear_history		#! 清空播放记录		| Clear History
+
+d			script-binding uosc_history/bookmarks			#! 收藏夹			| Bookmarks 
+Ctrl+d		script-binding uosc_history/add_bookmarks		#! 添加收藏			| Add Bookmarks 
+Alt+d		script-binding uosc_history/toggle_quick_mark	#! 切换快速收藏模式	| Switch Quick Bookmark	Mode
+Ctrl+Alt+d	script-binding uosc_history/clear_bookmarks     #! 清空收藏夹		| Clear Bookmarks
 ---------------------------------------------------------------------------------------------------
 
 --------------[ uosc按钮 | uosc Buttons ]--------------
-button:history			播放记录	| Playback History											
+button:history			播放记录	| Playback History
 button:bookmarks		收藏夹		| Bookmarks
 button:add_bookmarks	添加收藏	| Add Bookmarks
 -------------------------------------------------------
@@ -74,6 +76,9 @@ local t = o.language == 'zh' and {
 	bookmark_add = '收藏',
 	added = '已添加',
 	select_folder = '选择收藏夹',
+	quick_mark_folder = '快速收藏',
+	quick_mark_enable = '快速收藏: 启用',
+	quick_mark_disable = '快速收藏: 禁用',
 	change_folder = '移动到其他收藏夹',
 	create_bookmark_folder = '新建收藏夹',
 	create_folder_tip = '输入后回车创建新收藏夹',
@@ -110,6 +115,9 @@ local t = o.language == 'zh' and {
 	bookmark_add = 'Add Bookmark',
 	added = 'Added',
 	select_folder = 'Select Bookmark Group',
+	quick_mark_folder = 'Quick Bookmark',
+	quick_mark_enable = 'Quick Bookmark: ENABLED',
+	quick_mark_disable = 'Quick Bookmark: DISABLED',
 	change_folder = 'Change group',
 	create_bookmark_folder = 'Create a new group',
 	create_folder_tip = 'Type and press Enter to create',
@@ -131,8 +139,8 @@ local t = o.language == 'zh' and {
 	tooltip = 'Playback Records',
 	resume_in_folder = 'Resume Playback',
 	now = 'Playing Now',
-	log_enabled = 'Playback history logging enabled',
-	log_disabled = 'Playback history logging disabled',
+	log_enabled = 'History logging: ENABLED',
+	log_disabled = 'History logging: DISABLED',
 	live = 'Live',
 	unknown = 'Unknown',
 	search_results = 'Search Results',
@@ -166,7 +174,7 @@ local buttons = {
 }
 
 local options, entries, all, dedup, folders, new, bookmark_entries, bookmark_items, new_bookmark, results
-= {log = true, filter = 'dedup'}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+= {log = true, filter = 'dedup', quick_mark = false,}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 local state ={
 	-- 指示: 是否读取过日志
@@ -204,54 +212,6 @@ local function formatTime(s)
 	else
 		return t.unknown
 	end
-end
-
-local function selectBookmarkFolder()
-	local folders = {}
-	folders[1] = {
-		title = string.format('📁 %s',t.create_bookmark_folder),
-		value = {
-			new_folder = true,
-			folder_index = true,
-		},
-		align = 'center',
-		separator = true,
-		-- italic = true,
-	}
-
-	for i,v in ipairs(bookmark_entries) do
-		table.insert(folders, {
-			title = v.title,
-			value = {
-				folder_index = i,
-			},
-		})
-	end
-
-	local menu_props = {
-		id = 'select_folder',
-		title = t.select_folder,
-		items = folders,
-		callback = {script_name, 'bookmark_menu_event'},
-	}
-	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
-end
-
-local function addBookmarks()
-	if mp.get_property_bool('idle-active', 'false') then
-		return
-	end
-		
-	local title, path
-	if next(new) then 
-		title, path = new.media_title, new.path
-	else
-		path = mp.get_property('path', '')
-		title = mp.get_property('media-title', '')
-	end 
-	new_bookmark = {title = title, value = path}
-
-	selectBookmarkFolder()
 end
 
 local function clearBookmarks()
@@ -308,8 +268,9 @@ local function readLog()
 		local a = utils.parse_json(file:read("*a"))
 		file:close()
 		if a then
-			options, entries, bookmark_entries = a.options or {log = true, filter = 'dedup'}, a.entries or {}, a.bookmark_entries or {}
-			-- 兼容旧日志
+			options, entries, bookmark_entries = a.options and a.options, a.entries or {}, a.bookmark_entries or {}
+			-------------- 兼容旧日志 -------------
+			if options.quick_mark == nil then options.quick_mark = false end
 			if a.bookmarks then
 				local b_items = {}
 				for _,v in ipairs(a.bookmarks) do 
@@ -323,6 +284,7 @@ local function readLog()
 					items = b_items
 				})
 			end
+			----------------------------------------
 		end
 	end
 	if not state.have_read then
@@ -361,7 +323,7 @@ local function getBookmarkItems()
 		folder.item_actions_place = 'outside'
 		folder.on_move = 'callback'
 		folder.callback = {script_name, 'bookmark_menu_event'}
-		folder.footnote = t.move_bookmark_up .. '   ' .. t.move_bookmark_down .. '   ' .. t.rename_bookmarks
+		folder.footnote = t.move_bookmark_up .. '   ' .. t.move_bookmark_down .. '   ' .. t.delete_key .. '   ' .. t.rename_bookmarks
 		
 		table.insert(bookmark_items, folder)
 	end
@@ -658,6 +620,12 @@ local function onUnload(hook)
 	end
 end
 
+local function toggleQuickMark()
+	if not state.have_read then readLog() end
+	options.quick_mark = not options.quick_mark
+	mp.osd_message(options.quick_mark and t.quick_mark_enable or t.quick_mark_disable)
+end 
+
 local function enableHistory() 
 	if not state.have_read then readLog() end
 	if options.log then
@@ -808,7 +776,7 @@ local function insertBookmarkEntries(folder_index, new_folder)
 		mp.osd_message(t.added)
 		new_bookmark = nil
 		bookmark_items = {}
-		closeOrBack(index)
+		if not options.quick_mark then closeOrBack(index) end
 	end
 
 	if folder_index then
@@ -830,24 +798,94 @@ local function insertBookmarkEntries(folder_index, new_folder)
 		if v.title == new_folder then
 			for _, bookmark in ipairs(bookmark_entries[i].items) do
 				if bookmark.value == new_bookmark.value then
-					closeOrBack(#bookmark_entries[i].items)
+					if not options.quick_mark then 
+						closeOrBack(#bookmark_entries[i].items) 
+					end
 					mp.osd_message(t.bookmark_exists)
 					return
 				end
 			end
 			table.insert(bookmark_entries[i].items, new_bookmark)
 			afterInsert(#bookmark_entries[i].items)
-			break
 			return
 		end
 	end
 
 	-- 不存在, 创建
-	table.insert(bookmark_entries, {
-		title = new_folder,
-		items = {new_bookmark}
-	})
-	afterInsert(1)
+		if options.quick_mark then 
+			table.insert(bookmark_entries, 1, {
+				title = new_folder,
+				items = {new_bookmark}
+			})
+		else
+			table.insert(bookmark_entries, {
+				title = new_folder,
+				items = {new_bookmark}
+			})
+		end
+		afterInsert(1)
+	-- end
+end
+
+local function selectBookmarkFolder()
+	local folders = {}
+	folders[1] = {
+		title = string.format('📁 %s',t.create_bookmark_folder),
+		value = {
+			new_folder = true,
+			folder_index = true,
+		},
+		align = 'center',
+		separator = true,
+		-- italic = true,
+	}
+
+	for i,v in ipairs(bookmark_entries) do
+		table.insert(folders, {
+			title = v.title,
+			value = {
+				folder_index = i,
+			},
+		})
+	end
+
+	local menu_props = {
+		id = 'select_folder',
+		title = t.select_folder,
+		items = folders,
+		callback = {script_name, 'bookmark_menu_event'},
+	}
+	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+end
+
+local function addBookmarks()
+	if mp.get_property_bool('idle-active', 'false') then
+		return
+	end
+		
+	local title, path
+	if next(new) then 
+		path = new.path
+		if o.filename and not new.url then 
+			_, title = utils.split_path(path)
+		else 
+			title = new.media_title
+		end
+	else
+		path = mp.get_property('path', '')
+		if o.filename then 
+			title = mp.get_property('filename', '')
+		else 
+			title = mp.get_property('media-title', '')
+		end
+	end 
+	new_bookmark = {title = title, value = path}
+
+	if options.quick_mark then 
+		insertBookmarkEntries(nil, t.quick_mark_folder)
+	else
+		selectBookmarkFolder()
+	end
 end
 
 local function moveBookmark(from_index, to_index, menu_id) 
@@ -981,13 +1019,13 @@ local function endFile()
 end 
 
 local function searchHistory(menu_id, query)
-    local keywords = {}
+	local keywords = {}
 	query = string.lower(query)
-    for word in string.gmatch(query, "[^%s]+") do
-        if word ~= "" then
-            table.insert(keywords, word)
-        end
-    end
+	for word in string.gmatch(query, "[^%s]+") do
+		if word ~= "" then
+			table.insert(keywords, word)
+		end
+	end
 	if #keywords == 0 then return end
 
 	local function findWords(str)
@@ -1035,9 +1073,17 @@ local function historyMenuEvent(json)
 				state.back_to_result = true
 			else 
 				if options.filter == 'all' then
-					title = entries[event.index].media_title
+					if o.filename and not entries[event.index].url then
+						_, title = utils.split_path(entries[event.index].path)
+					else
+						title = entries[event.index].media_title
+					end
 				else
-					title = entries[event.value.peers[1]].media_title
+					if o.filename and not entries[event.value.peers[1]].url then
+						_, title = utils.split_path(entries[event.value.peers[1]].path)
+					else
+						title = entries[event.value.peers[1]].media_title
+					end
 				end
 			end
 			new_bookmark = {
@@ -1045,7 +1091,11 @@ local function historyMenuEvent(json)
 				value = event.value.path,
 			}
 			state.menu_index_after_mark = event.index
-			selectBookmarkFolder()
+			if options.quick_mark then 
+				insertBookmarkEntries(nil, t.quick_mark_folder)
+			else
+				selectBookmarkFolder()
+			end
 		elseif not event.action then
 			if event.value then
 				-- 加载文件
@@ -1200,6 +1250,7 @@ mp.add_key_binding(nil, 'clear_history', clearHistory)
 mp.add_key_binding(nil, 'bookmarks', toggleBookmark)
 mp.add_key_binding(nil, 'add_bookmarks', addBookmarks)
 mp.add_key_binding(nil, 'clear_bookmarks', clearBookmarks)
+mp.add_key_binding(nil, 'toggle_quick_mark', toggleQuickMark)
 mp.register_script_message('clear_confirmed', clearConfirmed)
 mp.register_script_message('history_menu_event', historyMenuEvent)
 mp.register_script_message('bookmark_menu_event', bookmarkMenuEvent)
