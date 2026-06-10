@@ -231,7 +231,8 @@ local function clearBookmarks()
 		selected_index = 2,
 		search_style = 'disabled',
 	}
-	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+	local menu_props_json = utils.format_json(menu_props)
+	mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 end
 
 local function clearHistory()
@@ -251,7 +252,8 @@ local function clearHistory()
 		selected_index = 2,
 		search_style = 'disabled',
 	}
-	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+	local menu_props_json = utils.format_json(menu_props)
+	mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 end
 
 local function clearConfirmed()
@@ -295,11 +297,12 @@ end
 
 local function writeLog()
 	if not state.have_read then return end
-	io.open(o.log_path, "w"):write(utils.format_json({
-		options = options, 
-		bookmark_entries = bookmark_entries, 
-		entries = entries, 
-	})):close()
+	local log = utils.format_json({
+		options = options,
+		bookmark_entries = bookmark_entries,
+		entries = entries,
+	})
+	io.open(o.log_path, "w"):write(log):close()
 end
 
 local function getBookmarkItems()
@@ -511,7 +514,7 @@ local function getNewEntry()
 			local peer = i.value.peers[1]
 			local entry = entries[peer]
 			if new.upper_path == entry.upper_path and new.path ~= entry.path then
-				mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({
+				local menu_props = {
 					title = t.resume_in_folder,
 					selected_index = 1,
 					items = {
@@ -531,7 +534,9 @@ local function getNewEntry()
 						}
 					},
 					callback = {script_name, 'history_menu_event'},
-				}))
+				}
+				local menu_props_json = utils.format_json(menu_props)
+				mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 				local last_all = all[peer]
 				last_all.icon = 'history'
 				last_all.actions_place = 'outside'
@@ -656,10 +661,11 @@ local function openBookmark(update, submenu_id)
 		footnote = t.move_bookmark_up .. '   ' .. t.move_bookmark_down .. '   ' .. t.delete_key .. '   ' .. t.rename_folders,
 	}
 
+	local menu_props_json = utils.format_json(menu_props)
 	if update then
-		mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(menu_props), submenu_id or '')
+		mp.commandv('script-message-to', 'uosc', 'update-menu', menu_props_json, submenu_id or '')
 	else
-		mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props), submenu_id or '')
+		mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json, submenu_id or '')
 	end
 end
 
@@ -699,10 +705,11 @@ local function openMenu(num, update)
 		menu_props.search_debounce = 'submit'
 	end 
 
+	local menu_props_json = utils.format_json(menu_props)
 	if update then
-		mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(menu_props))
+		mp.commandv('script-message-to', 'uosc', 'update-menu', menu_props_json)
 	else
-		mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+		mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 	end
 end
 
@@ -744,10 +751,11 @@ local function openResultMenu(index)
 		callback = {script_name, 'history_menu_event'},
 	}
 
+	local menu_props_json = utils.format_json(menu_props)
 	mp.commandv(
 		'script-message-to', 'uosc', 
 		mp.get_property_native('user-data/uosc/menu/id') == menu_props.id 
-		and 'update-menu' or 'open-menu', utils.format_json(menu_props)
+		and 'update-menu' or 'open-menu', menu_props_json
 	)
 end 
 
@@ -855,7 +863,8 @@ local function selectBookmarkFolder()
 		items = folders,
 		callback = {script_name, 'bookmark_menu_event'},
 	}
-	mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+	local menu_props_json = utils.format_json(menu_props)
+	mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 end
 
 local function addBookmarks()
@@ -948,7 +957,8 @@ local function renameType(menu_id, index)
 			end
 		end
 	end
-	mp.commandv('script-message-to', 'uosc', 'open-menu',  utils.format_json(menu_props))
+	local menu_props_json = utils.format_json(menu_props)
+	mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 end
 
 local function deleteHistoryEntries(peers, menu_index) 
@@ -1174,7 +1184,8 @@ local function bookmarkMenuEvent(json)
 						align = 'right',
 					}},
 				}
-				mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_props))
+				local menu_props_json = utils.format_json(menu_props)
+				mp.commandv('script-message-to', 'uosc', 'open-menu', menu_props_json)
 			else-- 插入收藏夹
 				insertBookmarkEntries(event.value.folder_index)
 			end
@@ -1224,7 +1235,8 @@ end
 
 local function startup()
 	for _, b in ipairs(buttons) do
-		mp.commandv('script-message-to', 'uosc', 'set-button', b.name, utils.format_json(b.value))
+		local value_json = utils.format_json(b.value)
+		mp.commandv('script-message-to', 'uosc', 'set-button', b.name, value_json)
 	end 
 	
 	if mp.get_property_bool('idle-active', 'false') then
