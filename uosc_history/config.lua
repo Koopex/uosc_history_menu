@@ -1,0 +1,45 @@
+﻿-- uosc_history_menu 配置默认值
+-- 可通过 mpv 的 script-opts 机制覆盖
+
+local defaults = {
+    -- 语言：'zh' 或 'en'
+    language = 'zh',
+
+    -- 启动动作：'resume' | 'menu' | 'none'
+    start_action = 'none',
+
+    -- 同文件夹续播提示
+    resume_in_folder = false,
+
+    -- 使用文件名而非媒体标题
+    filename = false,
+
+    -- 搜索结果按播放时间排序
+    search_sorting = false,
+
+    -- 日志文件路径（~~/ = 用户 home 目录）
+    log_path = '~~/uosc_history.json',
+}
+
+local M = {}
+
+--- 读取配置，应用 mpv script-opts 覆盖
+function M.read(script_name)
+    local mp = require('mp')
+    local options = require('mp.options')
+    local config = {}
+    for k, v in pairs(defaults) do
+        config[k] = v
+    end
+    options.read_options(config, script_name)
+    return config
+end
+
+--- 展开日志路径（处理 ~~/ 和 ~~home 等 mpv 路径前缀）
+function M.expand_log_path(log_path)
+    local mp = require('mp')
+    log_path = mp.command_native({'expand-path', log_path})
+    return log_path
+end
+
+return M
