@@ -26,6 +26,7 @@ function M.load(log_path)
     end
 
     return {
+        version = data.version,
         options = data.options or {},
         entries = data.entries or {},
         bookmark_entries = data.bookmark_entries or {},
@@ -35,6 +36,7 @@ end
 --- 保存数据到日志文件
 function M.save(log_path, data)
     local ok, json = pcall(require('mp.utils').format_json, {
+        version = 1,
         options = data.options,
         entries = data.entries,
         bookmark_entries = data.bookmark_entries,

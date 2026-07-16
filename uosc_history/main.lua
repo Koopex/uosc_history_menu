@@ -26,7 +26,7 @@ end
 local function safe_dofile(path)
     local ok, result = pcall(dofile, path)
     if not ok then
-        mp.msg.error('[uosc_history] 加载失败: ' .. path .. ' -- ' .. tostring(result))
+        mp.msg.error('module load failed: ' .. path .. ' -- ' .. tostring(result))
         return nil
     end
     return result
@@ -36,7 +36,7 @@ local config_mod = safe_dofile(script_dir .. '/config.lua')
 local utils = safe_dofile(script_dir .. '/utils.lua')
 
 if not config_mod or not utils then
-    mp.msg.error('[uosc_history] 核心模块加载失败，中止')
+    mp.msg.error('module load failed, aborting')
     return
 end
 
