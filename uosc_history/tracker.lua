@@ -118,7 +118,7 @@ end
 --- 检查同文件夹是否有其他视频可续播
 function M._check_resume_in_folder()
     local all_view = history.get_view('all')
-    local folders_view = history.get_view('folders')
+    local folders_view = history.get_view('by_folder')
 
     for _, f in ipairs(folders_view) do
         local peer = f.value.peers[1]
@@ -154,7 +154,7 @@ function M._check_resume_in_folder()
                 peer_all.icon = 'history'
                 peer_all.actions_place = 'outside'
             end
-            local dedup_view = history.get_view('dedup')
+            local dedup_view = history.get_view('recent')
             if peer_all and peer_all.dedup_index then
                 local peer_dedup = dedup_view[peer_all.dedup_index]
                 if peer_dedup then

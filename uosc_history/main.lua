@@ -42,11 +42,11 @@ end
 
 -- 读取并展开配置
 local config = config_mod.read(script_name)
-config.log_path = config_mod.expand_log_path(config.log_path)
+config.data_path = config_mod.expand_path(config.data_path)
 
 -- 初始化运行时选项默认值
 config.log = true
-config.filter = 'dedup'
+config.filter = 'recent'
 config.quick_mark = false
 
 -- 加载 i18n（回退到 en）
@@ -92,7 +92,7 @@ local shared_params = {
     config = config,
 }
 
-history.init({}, {log = true, filter = 'dedup', quick_mark = false, filename = config.filename})
+history.init({}, {log = true, filter = 'recent', quick_mark = false, use_filename = config.use_filename})
 bookmarks.init({})
 
 builder.init(script_name)
@@ -143,10 +143,10 @@ local data_loaded = false
 
 local function load_data()
     if data_loaded then return end; data_loaded = true
-    local data = storage.load(config.log_path)
+    local data = storage.load(config.data_path)
     if data then
         local opts = data.options or {}
-        if opts.filter == nil then opts.filter = 'dedup' end
+        if opts.filter == nil then opts.filter = 'recent' end
         if opts.log == nil then opts.log = true end
         if opts.quick_mark == nil then opts.quick_mark = false end
 
@@ -214,14 +214,14 @@ local function add_bookmarks()
 
     if new_entry and next(new_entry) then
         path = new_entry.path
-        if config.filename and not new_entry.url then
+        if config.use_filename and not new_entry.url then
             _, title = mp_utils.split_path(path)
         else
             title = new_entry.media_title
         end
     else
         path = mp.get_property('path', '')
-        if config.filename then
+        if config.use_filename then
             title = mp.get_property('filename', '')
         else
             title = mp.get_property('media-title', '')
@@ -325,7 +325,7 @@ local function on_shutdown()
         entries = history.get_entries(),
         bookmark_entries = bookmarks.get_entries(),
     }
-    storage.save(config.log_path, data)
+    storage.save(config.data_path, data)
 end
 
 -----------------------------------------------------------------------------
@@ -367,9 +367,9 @@ local function startup()
     load_data()
     if mp.get_property_bool('idle-active', 'false') then
         mp.observe_property('pause', 'bool', observe_pause)
-        if config.start_action == 'menu' then
+        if config.startup_action == 'menu' then
             toggle_history()
-        elseif config.start_action == 'resume' then
+        elseif config.startup_action == 'resume' then
             resume()
         end
     end

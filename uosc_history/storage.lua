@@ -7,8 +7,8 @@ local function get_mp()
 end
 
 --- 从日志文件加载数据
-function M.load(log_path)
-    local file, err = io.open(log_path, 'r')
+function M.load(data_path)
+    local file, err = io.open(data_path, 'r')
     if not file then
         get_mp().msg.error('Log file open failed: ' .. (err or 'unknown error'))
         return nil
@@ -34,7 +34,7 @@ function M.load(log_path)
 end
 
 --- 保存数据到日志文件
-function M.save(log_path, data)
+function M.save(data_path, data)
     local ok, json = pcall(require('mp.utils').format_json, {
         version = 1,
         options = data.options,
@@ -46,7 +46,7 @@ function M.save(log_path, data)
         return false
     end
 
-    local file, err = io.open(log_path, 'w')
+    local file, err = io.open(data_path, 'w')
     if not file then
         get_mp().msg.error('Log file open failed: ' .. (err or 'unknown error'))
         return false

@@ -35,12 +35,12 @@ function M.open(filter, select_index)
     if filter == 'all' then
         title = I18N.title_all .. ' (' .. tostring(#items) .. ')'
         id = 'all'
-    elseif filter == 'folders' then
+    elseif filter == 'by_folder' then
         title = I18N.title_folders .. ' (' .. tostring(#items) .. ')'
-        id = 'folders'
+        id = 'by_folder'
     else
         title = I18N.title_dedup .. ' (' .. tostring(#items) .. ')'
-        id = 'dedup'
+        id = 'recent'
     end
 
     local menu_props = {
@@ -72,12 +72,12 @@ function M.update(filter, select_index)
     if filter == 'all' then
         title = I18N.title_all .. ' (' .. tostring(#items) .. ')'
         id = 'all'
-    elseif filter == 'folders' then
+    elseif filter == 'by_folder' then
         title = I18N.title_folders .. ' (' .. tostring(#items) .. ')'
-        id = 'folders'
+        id = 'by_folder'
     else
         title = I18N.title_dedup .. ' (' .. tostring(#items) .. ')'
-        id = 'dedup'
+        id = 'recent'
     end
 
     local menu_props = {
@@ -107,7 +107,7 @@ function M.open_search(results, select_index, filter)
     filter = filter or history.get_filter()
     local prefix
     if filter == 'all' then prefix = I18N.title_all
-    elseif filter == 'folders' then prefix = I18N.title_folders
+    elseif filter == 'by_folder' then prefix = I18N.title_folders
     else prefix = I18N.title_dedup end
 
     local menu_props = {
@@ -195,9 +195,9 @@ function M.handlers.key(event)
         -- 循环切换过滤模式
         local cur = history.get_filter()
         if key == 'right' then
-            if cur == 'all' then cur = 'dedup' elseif cur == 'dedup' then cur = 'folders' elseif cur == 'folders' then cur = 'all' end
+            if cur == 'all' then cur = 'recent' elseif cur == 'recent' then cur = 'by_folder' elseif cur == 'by_folder' then cur = 'all' end
         else
-            if cur == 'all' then cur = 'folders' elseif cur == 'dedup' then cur = 'all' elseif cur == 'folders' then cur = 'dedup' end
+            if cur == 'all' then cur = 'by_folder' elseif cur == 'recent' then cur = 'all' elseif cur == 'by_folder' then cur = 'recent' end
         end
         history.set_filter(cur)
         M.update(cur, 1)
@@ -265,7 +265,7 @@ function M._handle_mark(event)
         value_path = event.value and event.value.path or ''
     else
         if history.get_filter() == 'all' then
-            if config.filename and raw_entries[event.index] and not history.is_url_entry(raw_entries[event.index]) then
+            if config.use_filename and raw_entries[event.index] and not history.is_url_entry(raw_entries[event.index]) then
                 _, title = utils.split_path(raw_entries[event.index].path)
             else
                 title = raw_entries[event.index] and raw_entries[event.index].media_title or ''
@@ -275,7 +275,7 @@ function M._handle_mark(event)
             local peers = event.value and event.value.peers
             local raw_idx = peers and peers[1]
             if raw_idx then
-                if config.filename and not history.is_url_entry(raw_entries[raw_idx]) then
+                if config.use_filename and not history.is_url_entry(raw_entries[raw_idx]) then
                     _, title = utils.split_path(raw_entries[raw_idx].path)
                 else
                     title = raw_entries[raw_idx].media_title or ''

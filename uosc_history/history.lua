@@ -1,4 +1,4 @@
-﻿-- 播放历史数据模型
+-- 播放历史数据模型
 -- 管理原始条目数组和计算视图（全部/去重/文件夹）
 
 local M = {}
@@ -33,7 +33,7 @@ end
 
 --- 获取当前过滤设置
 function M.get_filter()
-    return opts.filter or 'dedup'
+    return opts.filter or 'recent'
 end
 
 --- 设置当前过滤
@@ -116,7 +116,7 @@ local function compute_views()
             end
         else
             local title
-            if opts.filename then
+            if opts.use_filename then
                 _, title = utils.split_path(entry.path)
             else
                 title = entry.media_title or 'Unknown'
@@ -162,9 +162,9 @@ end
 --- 按过滤名称获取计算视图
 function M.get_view(filter)
     compute_views()
-    filter = filter or opts.filter or 'dedup'
+    filter = filter or opts.filter or 'recent'
     if filter == 'all' then return cache.all
-    elseif filter == 'folders' then return cache.folders
+    elseif filter == 'by_folder' then return cache.folders
     else return cache.dedup end
 end
 
