@@ -18,14 +18,15 @@ local new_entry = nil
 -- 状态标志
 local loaded = false      -- 首次 file-loaded 后为 true，防止重复触发 resume_in_folder
 local from_record = false -- 通过历史/收藏菜单加载时为 true
+local auto_next = false   -- 自动跳转下一集后，跳过本次同文件夹检查
 
 --- 注入依赖
-function M.init(cfg, i18n, st, hist, ut)
-    config = cfg
-    I18N = i18n
-    storage = st
-    history = hist
-    utils = ut
+function M.init(params)
+    config = params.config
+    I18N = params.i18n
+    storage = params.storage
+    history = params.history
+    utils = params.utils
 end
 
 function M.get_new_entry()
@@ -44,7 +45,8 @@ function M.on_file_loaded()
     new_entry.media_title = mp.get_property('media-title', '')
     new_entry.datetime = os.date('%Y/%m/%d  %H:%M')
     new_entry.path = mp.get_property('path', '')
-    new_entry.progress = utils.format_time(mp.get_property_number('duration', 0))
+    new_entry.duration = math.floor(mp.get_property_number('duration', 0))
+
 
     if utils.is_url(new_entry.path) then
         M._handle_url()
@@ -95,7 +97,7 @@ function M._handle_url()
     local twice = false
     local function ob_duration(_, d)
         if d and twice then
-            new_entry.progress = I18N.live
+            new_entry.live = true
             mp.unobserve_property(ob_duration)
         end
         twice = true
@@ -106,9 +108,9 @@ end
 
 --- 处理本地文件条目
 function M._handle_local_file()
-    new_entry.upper_path, new_entry.folder = utils.get_folder_info(new_entry.path, utils_mod)
-
-    if not loaded and not from_record and config.resume_in_folder then
+    if auto_next then
+        auto_next = false
+    elseif not loaded and not from_record and config.resume_in_folder then
         M._check_resume_in_folder()
     end
 
@@ -117,6 +119,13 @@ end
 
 --- 检查同文件夹是否有其他视频可续播
 function M._check_resume_in_folder()
+    local function hint(entry)
+        if entry.live then return I18N.live end
+        if entry.duration and entry.duration > 0 then
+            return utils.format_time(entry.pos or 0) .. ' / ' .. utils.format_time(entry.duration)
+        end
+        return ''
+    end
     local all_view = history.get_view('all')
     local folders_view = history.get_view('by_folder')
 
@@ -124,18 +133,54 @@ function M._check_resume_in_folder()
         local peer = f.value.peers[1]
         local raw_entries = history.get_entries()
         local entry = raw_entries[peer]
+        -- 双方都按视频所在上层文件夹现算（条目不再存储 upper_path/folder）
+        local new_upper = utils and utils.get_folder_info and utils.get_folder_info(new_entry.path, utils_mod)
+        local entry_upper = utils and utils.get_folder_info and utils.get_folder_info(entry.path, utils_mod)
 
-        if new_entry.upper_path == entry.upper_path and new_entry.path ~= entry.path then
+        if new_upper and new_upper == entry_upper and new_entry.path ~= entry.path then
+            -- 默认提示恢复该记录；若已播进度超过重播阈值，则改为提示播放该文件夹中的下一个视频（从头）
+            local target = entry
+            local target_hint = hint(entry)
+            local target_is_next = false
+            local progress = 0
+            if entry.duration and entry.duration > 0 then
+                progress = (entry.pos or 0) / entry.duration * 100
+            end
+            if progress > (config.restart_threshold or 90) then
+                local next_path = M._find_next_in_folder(entry)
+                if not next_path then return end -- 没有下一个文件，不提示
+                local _, next_name = utils_mod.split_path(next_path)
+                -- 从头播放：pos 固定为 0；时长取该文件自身的历史记录（若有）
+                local next_entry = M._find_entry_by_path(next_path)
+                target = {
+                    path = next_path,
+                    media_title = next_name,
+                    pos = 0,
+                    duration = next_entry and next_entry.duration,
+                    url = false,
+                    audio_path = nil,
+                }
+                target_hint = I18N.from_start
+                target_is_next = true
+            end
             local menu_props = {
                 title = I18N.resume_in_folder,
                 selected_index = 1,
                 items = {
                     {
-                        title = entry.media_title,
-                        hint = entry.progress,
+                        title = target.media_title,
+                        hint = target_hint,
                         active = true,
                         icon = 'history',
-                        value = { path = entry.path, pos = entry.pos },
+                        value = {
+                            path = target.path,
+                            pos = target.pos,
+                            duration = target.duration,
+                            url = target.url,
+                            audio_path = target.audio_path,
+                            media_title = target.media_title,
+                            auto_next = target_is_next,
+                        },
                     },
                     {
                         title = new_entry.media_title,
@@ -143,6 +188,7 @@ function M._check_resume_in_folder()
                         muted = true,
                         selectable = false,
                         icon = '',
+                        italic = true,
                     },
                 },
                 callback = { script_name, 'history_menu_event' },
@@ -165,6 +211,39 @@ function M._check_resume_in_folder()
             break
         end
     end
+end
+
+--- 按路径查找历史记录条目（用于取时长等元数据）
+function M._find_entry_by_path(path)
+    for _, e in ipairs(history.get_entries()) do
+        if e.path == path then return e end
+    end
+    return nil
+end
+
+--- 查找记录条目在文件夹中的下一个视频路径；没有则返回 nil
+function M._find_next_in_folder(entry)
+    if not entry or not entry.path or entry.url then return nil end
+    local platform = mp.get_property_native('platform')
+    local ok, filenames = pcall(utils.list_dir_videos, entry.path, utils_mod, platform)
+    if not ok or not filenames then return nil end
+    local dir_path, entry_name = utils_mod.split_path(entry.path)
+    local next_name
+    for i, name in ipairs(filenames) do
+        if name == entry_name then
+            next_name = filenames[i + 1]
+            break
+        end
+    end
+    if not next_name then return nil end -- 已是最后一个文件
+    local next_path = utils_mod.join_path(dir_path, next_name)
+    if next_path == new_entry.path then return nil end -- 下一个就是当前文件，无需提示
+    return next_path
+end
+
+--- 标记即将加载的文件是自动跳转的下一集（加载后跳过本次同文件夹检查）
+function M.set_auto_next(val)
+    auto_next = val or false
 end
 
 --- end-file 时调用：完成条目并插入历史
@@ -191,14 +270,11 @@ function M.on_unload(hook)
     hook:cont()
 
     if pos >= 3 then
-        new_entry.pos = pos - 3
+        new_entry.pos = math.floor(pos - 3)
     else
         new_entry.pos = 0
     end
 
-    if new_entry.progress then
-        new_entry.progress = utils.format_time(pos) .. ' / ' .. new_entry.progress
-    end
 end
 
 --- 清空新条目（禁用记录时）
@@ -210,8 +286,8 @@ end
 function M.load_file(params)
     from_record = true
     local opts = string.format('start=%d', params.pos or 0)
-    if params.url then
-        opts = string.format('%s,force-media-title="%s"', opts, params.media_title or '')
+    if params.media_title and params.media_title ~= '' then
+        opts = string.format('%s,force-media-title="%s"', opts, params.media_title)
     end
     if params.audio_path then
         opts = string.format('%s,audio-files="%s"', opts, params.audio_path)

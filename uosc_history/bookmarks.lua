@@ -10,8 +10,9 @@ local entries = {}
 local menu_items_cache = nil
 
 --- 用加载的数据初始化
-function M.init(data)
-    entries = data or {}
+function M.init(params)
+    params = params or {}
+    entries = params.entries or {}
     M.invalidate_cache()
 end
 

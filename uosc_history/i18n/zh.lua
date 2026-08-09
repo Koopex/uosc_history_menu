@@ -37,6 +37,8 @@ local M = {
     live = '直播',
     unknown = '未知',
     search_results = '搜索结果',
+    url_group_hint = '%d 项',
+    from_start = '从头播放',
     cleared = '已清空',
 }
 

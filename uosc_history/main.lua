@@ -92,10 +92,10 @@ local shared_params = {
     config = config,
 }
 
-history.init({}, {log = true, filter = 'recent', quick_mark = false, use_filename = config.use_filename})
-bookmarks.init({})
+history.init({entries = {}, opts = {log = true, filter = 'recent', quick_mark = false}, config = config, utils = utils, i18n = I18N})
+bookmarks.init({entries = {}})
 
-builder.init(script_name)
+builder.init({script_name = script_name})
 
 history_menu.init(merge(shared_params, {
     history = history,
@@ -108,7 +108,7 @@ bookmark_menu.init(merge(shared_params, {
     history_menu = history_menu,
 }))
 
-tracker.init(config, I18N, storage, history, utils)
+tracker.init({config = config, i18n = I18N, storage = storage, history = history, utils = utils})
 
 -----------------------------------------------------------------------------
 -- 跨模块桥接 ---------------------------------------------------------------
@@ -118,6 +118,7 @@ local actions = {}
 
 function actions.load_file(params)
     tracker.set_from_record(true)
+    if params and params.auto_next then tracker.set_auto_next(true) end
     tracker.load_file(params)
 end
 
@@ -150,8 +151,8 @@ local function load_data()
         if opts.log == nil then opts.log = true end
         if opts.quick_mark == nil then opts.quick_mark = false end
 
-        history.init(data.entries or {}, opts)
-        bookmarks.init(data.bookmark_entries or {})
+        history.init({entries = data.entries or {}, opts = opts, config = config, utils = utils, i18n = I18N})
+        bookmarks.init({entries = data.bookmark_entries or {}})
 
         if opts.log ~= nil then config.log = opts.log end
         if opts.filter ~= nil then config.filter = opts.filter end
@@ -279,7 +280,7 @@ local function resume()
         local e = entries[1]
         tracker.load_file({
             path = e.path,
-            pos = e.pos,
+            pos = utils.apply_restart_threshold(e.pos, e.duration, config.restart_threshold),
             url = e.url,
             audio_path = e.audio_path,
             media_title = e.media_title,

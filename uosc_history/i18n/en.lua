@@ -37,6 +37,8 @@ local M = {
     live = 'Live',
     unknown = 'Unknown',
     search_results = 'Search Results',
+    url_group_hint = '%d items',
+    from_start = 'From start',
     cleared = 'Cleared',
 }
 

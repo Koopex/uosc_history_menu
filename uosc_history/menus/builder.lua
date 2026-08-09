@@ -4,8 +4,8 @@ local M = {}
 
 local script_name
 
-function M.init(scr_name)
-    script_name = scr_name
+function M.init(params)
+    script_name = params.script_name
 end
 
 --- 构建确认对话框菜单

@@ -223,19 +223,18 @@ end
 
 function M._get_load_values(event, value)
     if value.path then
-        local raw_entries = history.get_entries()
-        local entry = raw_entries[event.index]
-        local values = { path = value.path, pos = value.pos }
-        if value.url then
-            values.url = true
-            values.audio_path = value.audio_path
-            values.media_title = value.media_title
-        elseif entry then
-            values.url = entry.url
-            values.audio_path = entry.audio_path
-            values.media_title = entry.media_title
-        end
-        return values
+        -- 已播进度超过阈值百分比则从头播放，否则恢复进度
+        local pos = (M.global_utils and M.global_utils.apply_restart_threshold(value.pos, value.duration, config.restart_threshold))
+            or value.pos or 0
+        -- 元数据直接取自视图 value，避免用视图索引回查原始数组导致错位
+        return {
+            path = value.path,
+            pos = pos,
+            url = value.url,
+            audio_path = value.audio_path,
+            media_title = value.media_title,
+            auto_next = value.auto_next,
+        }
     end
     return value
 end
@@ -255,34 +254,22 @@ function M._handle_delete(event)
 end
 
 function M._handle_mark(event)
-    local raw_entries = history.get_entries()
     local is_search = (event.menu_id == 'search_menu')
-    local title = ''
-    local value_path = ''
-
+    -- 统一从视图 value 取干净元数据（与原始 entries 同源，含 media_title/path）
+    local v
     if is_search and pending.search_results then
-        title = pending.search_results[event.index] and pending.search_results[event.index].title or ''
-        value_path = event.value and event.value.path or ''
+        local item = pending.search_results[event.index]
+        v = item and item.value
     else
-        if history.get_filter() == 'all' then
-            if config.use_filename and raw_entries[event.index] and not history.is_url_entry(raw_entries[event.index]) then
-                _, title = utils.split_path(raw_entries[event.index].path)
-            else
-                title = raw_entries[event.index] and raw_entries[event.index].media_title or ''
-            end
-            value_path = raw_entries[event.index] and raw_entries[event.index].path or ''
-        else
-            local peers = event.value and event.value.peers
-            local raw_idx = peers and peers[1]
-            if raw_idx then
-                if config.use_filename and not history.is_url_entry(raw_entries[raw_idx]) then
-                    _, title = utils.split_path(raw_entries[raw_idx].path)
-                else
-                    title = raw_entries[raw_idx].media_title or ''
-                end
-                value_path = raw_entries[raw_idx].path or ''
-            end
-        end
+        v = event.value
+    end
+
+    local title = ''
+    local value_path = v and v.path or ''
+    if v and config.use_filename and not v.url then
+        _, title = utils.split_path(v.path)
+    else
+        title = v and v.media_title or ''
     end
 
     M.set_mark_return(is_search and 'search' or 'menu', history.get_filter(), event.index, pending.search_results)

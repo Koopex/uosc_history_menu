@@ -1,4 +1,4 @@
-﻿-- 纯函数工具，不依赖 mpv API
+-- 纯函数工具，不依赖 mpv API
 
 local M = {}
 
@@ -16,12 +16,24 @@ function M.format_time(s)
     end
 end
 
+--- 根据重播阈值决定起始位置：已播进度超过阈值百分比则从头播放（0 = 始终从头；100 = 始终恢复）
+function M.apply_restart_threshold(pos, duration, threshold)
+    pos = pos or 0
+    if threshold and threshold >= 0 and duration and duration > 0 then
+        if pos / duration * 100 > threshold then
+            return 0
+        end
+    end
+    return pos
+end
+
 --- 检查路径是否为 URL（http/https/rtmp）
 function M.is_url(path)
     return path:match('^http[s]?://') ~= nil or path:match('^rtmp://') ~= nil
 end
 
---- 从文件路径提取文件夹信息（Season 感知）
+--- 从文件路径提取文件夹信息：分组始终按视频所在的上层文件夹（不区分是否 Season）；
+--- 仅当该文件夹是 "Season xx" 时，标题再向上取一层显示为 "XXX / Season xx"
 function M.get_folder_info(path, utils)
     local upper_p1 = utils.split_path(path)
     local upper_p2, parent_d1 = utils.split_path(upper_p1:sub(1, -2))
@@ -32,15 +44,15 @@ function M.get_folder_info(path, utils)
     else
         local upper_p3, parent_d2 = utils.split_path(upper_p2:sub(1, -2))
         if parent_d2 == '' then
-            return upper_p2, string.format('%s / %s', upper_p2, parent_d1)
+            return upper_p1, string.format('%s / %s', upper_p2, parent_d1)
         else
-            return upper_p2, string.format('%s / %s', parent_d2, parent_d1)
+            return upper_p1, string.format('%s / %s', parent_d2, parent_d1)
         end
     end
 end
 
---- 计算文件夹内位置字符串，如 "3 / 12"
-function M.get_pos_in_folder(path, utils, platform)
+--- 列出同目录下同扩展名的视频文件名（自然排序，含扩展名过滤）
+function M.list_dir_videos(path, utils, platform)
     local dir_path, file_name = utils.split_path(path)
     local ext = file_name:match('^.+()%..-$') and file_name:match('^.+(%..+)$') or ''
 
@@ -87,7 +99,13 @@ function M.get_pos_in_folder(path, utils, platform)
     end
 
     alphanumsort(filenames)
+    return filenames
+end
 
+--- 计算文件夹内位置字符串，如 "3 / 12"
+function M.get_pos_in_folder(path, utils, platform)
+    local _, file_name = utils.split_path(path)
+    local filenames = M.list_dir_videos(path, utils, platform)
     local current = 0
     for i = 1, #filenames do
         if filenames[i] == file_name then
@@ -95,7 +113,6 @@ function M.get_pos_in_folder(path, utils, platform)
             break
         end
     end
-
     return string.format('%s / %s', current, #filenames)
 end
 
