@@ -45,33 +45,10 @@ function M.input_dialog(hint, callback, id, initial_value)
             align = 'right',
         }},
     }
-    if initial_value and #initial_value < 150 then
+    if initial_value and #initial_value > 0 and #initial_value < 150 then
         props.search_suggestion = initial_value
     end
     return props
-end
-
---- 构建分组选择列表菜单
-function M.folder_list_menu(folders, title, callback, create_label)
-    local items = {}
-    items[1] = {
-        title = create_label,
-        value = { new_folder = true, folder_index = true },
-        align = 'center',
-        separator = true,
-    }
-    for i, v in ipairs(folders) do
-        table.insert(items, {
-            title = v.title,
-            value = { folder_index = i },
-        })
-    end
-    return {
-        id = 'select_folder',
-        title = title,
-        items = items,
-        callback = callback,
-    }
 end
 
 return M

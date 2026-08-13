@@ -19,9 +19,15 @@ local defaults = {
 
     -- 搜索结果按播放时间排序
     search_sorting = false,
+    
+    -- 历史记录最大保存条数（0 = 不限制，默认值；设为正数后超出部分裁掉最旧记录）
+    max_entries = 0,
 
     -- 日志文件路径（~~/ = 用户 home 目录）
     data_path = '~~/uosc_history.json',
+
+    -- 收藏夹独立存储文件路径；留空则与历史记录存于同一文件（data_path）
+    bookmark_path = '',
 }
 
 local M = {}

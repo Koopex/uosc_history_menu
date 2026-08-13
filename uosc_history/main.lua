@@ -33,7 +33,7 @@ local function safe_dofile(path)
 end
 
 local config_mod = safe_dofile(script_dir .. '/config.lua')
-local utils = safe_dofile(script_dir .. '/utils.lua')
+local utils = safe_dofile(script_dir .. '/lib/utils.lua')
 
 if not config_mod or not utils then
     mp.msg.error('module load failed, aborting')
@@ -43,6 +43,9 @@ end
 -- 读取并展开配置
 local config = config_mod.read(script_name)
 config.data_path = config_mod.expand_path(config.data_path)
+if config.bookmark_path and config.bookmark_path ~= '' then
+    config.bookmark_path = config_mod.expand_path(config.bookmark_path)
+end
 
 -- 初始化运行时选项默认值
 config.log = true
@@ -61,9 +64,10 @@ if not I18N then
 end
 
 -- 加载数据模块
-local storage = safe_dofile(script_dir .. '/storage.lua')
-local history = safe_dofile(script_dir .. '/history.lua')
-local bookmarks = safe_dofile(script_dir .. '/bookmarks.lua')
+local storage = safe_dofile(script_dir .. '/core/storage.lua')
+local history = safe_dofile(script_dir .. '/core/history.lua')
+local bookmarks = safe_dofile(script_dir .. '/core/bookmarks.lua')
+local clipboard = safe_dofile(script_dir .. '/lib/clipboard.lua')
 
 -- 加载菜单模块
 local builder = safe_dofile(script_dir .. '/menus/builder.lua')
@@ -71,9 +75,9 @@ local history_menu = safe_dofile(script_dir .. '/menus/history_menu.lua')
 local bookmark_menu = safe_dofile(script_dir .. '/menus/bookmark_menu.lua')
 
 -- 加载追踪器
-local tracker = safe_dofile(script_dir .. '/tracker.lua')
+local tracker = safe_dofile(script_dir .. '/core/tracker.lua')
 
-if not storage or not history or not bookmarks or not builder
+if not storage or not history or not bookmarks or not clipboard or not builder
     or not history_menu or not bookmark_menu or not tracker then
     mp.msg.error('module load failed, aborting')
     return
@@ -94,18 +98,23 @@ local shared_params = {
 
 history.init({entries = {}, opts = {log = true, filter = 'recent', quick_mark = false}, config = config, utils = utils, i18n = I18N})
 bookmarks.init({entries = {}})
+clipboard.init({ mp = mp, utils = mp_utils })
 
 builder.init({script_name = script_name})
 
 history_menu.init(merge(shared_params, {
     history = history,
     builder = builder,
+    clipboard = clipboard,
 }))
 
 bookmark_menu.init(merge(shared_params, {
     bookmarks = bookmarks,
     builder = builder,
     history_menu = history_menu,
+    history = history,
+    our_utils = utils,
+    clipboard = clipboard,
 }))
 
 tracker.init({config = config, i18n = I18N, storage = storage, history = history, utils = utils})
@@ -124,10 +133,19 @@ end
 
 function actions.add_bookmark(bm)
     if config.quick_mark then
-        bookmark_menu.start_add_bookmark(bm.title, bm.value, true)
+        bookmark_menu.start_add_bookmark(bm.title, bm.path, true)
     else
         bookmark_menu.set_pending_bookmark(bm)
         bookmark_menu.open_folder_selector()
+    end
+end
+
+--- 收藏一个完整节点（叶子或带子项的分组）：快速模式直接插入快速收藏，否则打开位置浏览器
+function actions.add_bookmark_node(node)
+    if config.quick_mark then
+        bookmark_menu.start_add_bookmark_node(node, true)
+    else
+        bookmark_menu.start_add_bookmark_node(node, false)
     end
 end
 
@@ -152,7 +170,12 @@ local function load_data()
         if opts.quick_mark == nil then opts.quick_mark = false end
 
         history.init({entries = data.entries or {}, opts = opts, config = config, utils = utils, i18n = I18N})
-        bookmarks.init({entries = data.bookmark_entries or {}})
+        if config.bookmark_path and config.bookmark_path ~= '' then
+            -- 独立收藏文件：不存在或为空时从主文件增量迁移
+            bookmarks.init({entries = storage.load_bookmarks(config.bookmark_path, data.bookmark_entries or {})})
+        else
+            bookmarks.init({entries = data.bookmark_entries or {}})
+        end
 
         if opts.log ~= nil then config.log = opts.log end
         if opts.filter ~= nil then config.filter = opts.filter end
@@ -229,11 +252,34 @@ local function add_bookmarks()
         end
     end
 
-    bookmark_menu.set_pending_bookmark({title = title, value = path})
+    bookmark_menu.set_pending_bookmark({title = title, path = path})
     if config.quick_mark then
         bookmark_menu.start_add_bookmark(title, path, true)
     else
         bookmark_menu.open_folder_selector()
+    end
+end
+
+--- 收藏当前播放列表：无播放列则忽略
+local function add_playlist()
+    local count = mp.get_property_number('playlist-count', 0)
+    if not count or count < 1 then return end
+    local playlist = mp.get_property_native('playlist') or {}
+    local items = {}
+    for _, entry in ipairs(playlist) do
+        if entry and entry.filename and entry.filename ~= '' then
+            local title = entry.title
+            if not title or title == '' then
+                title = utils.title_from_path(entry.filename)
+            end
+            table.insert(items, { title = title, path = entry.filename })
+        end
+    end
+    if #items == 0 then return end
+    if config.quick_mark then
+        bookmark_menu.add_playlist_quick(items)
+    else
+        bookmark_menu.start_add_playlist(items)
     end
 end
 
@@ -324,8 +370,13 @@ local function on_shutdown()
             quick_mark = config.quick_mark,
         },
         entries = history.get_entries(),
-        bookmark_entries = bookmarks.get_entries(),
     }
+    if config.bookmark_path and config.bookmark_path ~= '' then
+        -- 收藏写入独立文件，主文件不再包含 bookmark_entries
+        storage.save_bookmarks(config.bookmark_path, bookmarks.get_entries())
+    else
+        data.bookmark_entries = bookmarks.get_entries()
+    end
     storage.save(config.data_path, data)
 end
 
@@ -358,6 +409,14 @@ local buttons = {
             command = 'script-binding ' .. script_name .. '/add_bookmarks',
         },
     },
+    {
+        name = 'add_playlist',
+        value = {
+            icon = 'playlist_add',
+            tooltip = I18N.bookmark_playlist,
+            command = 'script-binding ' .. script_name .. '/add_playlist',
+        },
+    },
 }
 
 local function startup()
@@ -385,6 +444,7 @@ mp.add_key_binding(nil, 'enable_history', enable_history)
 mp.add_key_binding(nil, 'clear_history', clear_history)
 mp.add_key_binding(nil, 'bookmarks', toggle_bookmarks)
 mp.add_key_binding(nil, 'add_bookmarks', add_bookmarks)
+mp.add_key_binding(nil, 'add_playlist', add_playlist)
 mp.add_key_binding(nil, 'clear_bookmarks', clear_bookmarks)
 mp.add_key_binding(nil, 'toggle_quick_mark', toggle_quick_mark)
 
@@ -392,6 +452,7 @@ mp.register_script_message('clear_confirmed_history', clear_confirmed_history)
 mp.register_script_message('clear_confirmed_bookmarks', clear_confirmed_bookmarks)
 mp.register_script_message('history_menu_event', function(json) history_menu.handle_event(json) end)
 mp.register_script_message('bookmark_menu_event', function(json) bookmark_menu.handle_event(json) end)
+mp.register_script_message('bookmark_pick_event', function(json) bookmark_menu.handle_pick_event(json) end)
 
 mp.add_hook('on_unload', 50, on_unload)
 mp.register_event('file-loaded', on_file_loaded)
