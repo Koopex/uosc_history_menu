@@ -18,6 +18,8 @@ Use `Left/Right Arrow Keys` to switch filtering modes when the menu is open (All
 | Recent Media | Latest record per video | Played / Total duration | All records for that video |
 | By Source | Records grouped by folder (local files) or domain/IP (URLs), shown in submenus | Played / Total duration | All records in that folder/domain |
 
+> **By Source**: nested submenus by folder/domain by default. With `source_view_flat=yes`, local files use flat grouping (only the newest record per folder, hint shows in-folder position); URLs are still grouped by domain/IP.
+
 ### Icons
 
 Items are prefixed with a type icon: `🔗` URL, `🎬` local file, `📁` folder.
@@ -39,7 +41,9 @@ Items are prefixed with a type icon: `🔗` URL, `🎬` local file, `📁` folde
   | --- | --- | --- |
   | Delete | `Del` |  |
   | Rename | `F2` |  |
+  | New Group | `Ctrl+n` | Create a new group in the current level |
   | Reorder | `Ctrl+Home/End/PgUp/PgDw/↑/↓` |  |
+  | Move | *(action button)* | Move the item to a chosen location |
   | Copy / Cut | `Ctrl+c` / `Ctrl+x` | Copies item info to the clipboard (JSON format) |
   | Paste / Import | `Ctrl+v` | Open the bookmarks menu, then import below the currently selected item:<br>1. Paste a path or URL, then enter a name when prompted<br>2. Copy an item from history or bookmarks and paste it at the desired location<br>3. Paste a hand-written JSON array/table. Items require `title` and `path`; groups require `title` and `items` (array) |
 
@@ -55,7 +59,11 @@ Edit `script-opts/uosc_history.conf`:
 | `restart_threshold` | `90` | Play from the beginning when progress exceeds this percentage |
 | `use_filename` | `no` | Use filename instead of media title |
 | `search_sorting` | `no` | Sort search results by play time |
+| `source_view_flat` | `no` | "By Source" view: `yes` = flat grouping (newest record per folder), `no` = nested submenus |
 | `max_entries` | `0` | Max history entries kept (`0` = unlimited) |
+| `bookmark_new_group_button` | `no` | Show a "New Group" button at the top of every bookmarks level |
+| `history_actions` | `mark,delete` | Action buttons for history entries (comma-separated; empty = none, shortcuts still work) |
+| `bookmark_actions` | `rename,move,delete` | Action buttons for bookmark entries (comma-separated; empty = none, shortcuts still work) |
 | `data_path` | `~~/uosc_history.json` | History data file |
 | `bookmark_path` | *(empty)* | Separate bookmark file; empty = same file as `data_path` |
 

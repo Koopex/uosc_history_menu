@@ -180,7 +180,6 @@ local function load_data()
         if opts.log ~= nil then config.log = opts.log end
         if opts.filter ~= nil then config.filter = opts.filter end
         if opts.quick_mark ~= nil then config.quick_mark = opts.quick_mark end
-        mp.msg.info(opts.log and I18N.log_enabled or I18N.log_disabled)
     end
 end
 
@@ -336,7 +335,9 @@ local function resume()
 end
 
 local function observe_pause(_, pause)
-    if resume_state.resumable then
+    -- 只在 mpv 处于空闲状态时才把暂停当作恢复上次播放的信号：
+    -- 新文件加载时 watch-later 恢复的 pause=yes 也会触发本回调，此时不能劫持正在加载的文件
+    if resume_state.resumable and mp.get_property_bool('idle-active', false) then
         resume()
     end
     resume_state.resumable = true

@@ -43,6 +43,22 @@ local function enrich_submenus(list, item_actions)
     end
 end
 
+--- 根据配置的操作按钮列表构建 uosc 按钮（顺序即显示顺序）
+--- 按钮定义在调用时构造，避免模块加载期引用尚未注入的 I18N
+local function build_actions(list)
+    local defs = {
+        mark   = { icon = 'star', label = I18N.bookmark_add },
+        copy   = { icon = 'content_copy', label = I18N.copy },
+        delete = { icon = 'delete', label = I18N.del },
+    }
+    local actions = {}
+    for _, name in ipairs(list or {}) do
+        local def = defs[name]
+        if def then actions[#actions + 1] = { name = name, icon = def.icon, label = def.label } end
+    end
+    return actions
+end
+
 --- 构造历史菜单属性（open/update 共用）
 local function build_props(filter, select_index)
     local items = history.get_view(filter)
@@ -59,10 +75,7 @@ local function build_props(filter, select_index)
         id = 'recent'
     end
 
-    local item_actions = {
-        { name = 'mark', icon = 'star', label = I18N.bookmark_add },
-        { name = 'delete', icon = 'delete', label = I18N.del },
-    }
+    local item_actions = build_actions(config.history_actions)
     if filter == 'by_folder' then
         enrich_submenus(items, item_actions)
     end
@@ -127,7 +140,7 @@ local function build_search_props(results, select_index, filter)
         title = string.format('%s - %s(%d)', prefix, I18N.search_results, #results),
         items = results,
         selected_index = select_index or 0,
-        item_actions = {{ name = 'mark', icon = 'star', label = I18N.bookmark_add }},
+        item_actions = build_actions(config.history_actions),
         on_search = 'callback',
         search_debounce = 'submit',
         callback = { script_name, 'history_menu_event' },
@@ -185,6 +198,8 @@ function M.handlers.activate(event)
         M._handle_delete(event)
     elseif action == 'mark' then
         M._handle_mark(event)
+    elseif action == 'copy' then
+        M._handle_copy(event)
     else
         local value = event.value
         if not value then return end

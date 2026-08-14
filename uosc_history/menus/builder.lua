@@ -28,11 +28,12 @@ function M.confirm_dialog(title, yes_text, no_text, on_confirm)
     }
 end
 
---- 构建重命名/输入面板菜单
-function M.input_dialog(hint, callback, id, initial_value)
+--- 构建重命名/输入面板菜单：title 显示在菜单顶部说明用途（避免被误认为搜索框），
+--- hint 为底部操作提示
+function M.input_dialog(title, hint, callback, id, initial_value)
     local props = {
         id = id,
-        title = '',
+        title = title,
         callback = callback,
         on_search = 'callback',
         search_style = 'palette',
@@ -41,8 +42,7 @@ function M.input_dialog(hint, callback, id, initial_value)
             title = hint,
             selectable = false,
             italic = true,
-            muted = true,
-            align = 'right',
+            align = 'center',
         }},
     }
     if initial_value and #initial_value > 0 and #initial_value < 150 then

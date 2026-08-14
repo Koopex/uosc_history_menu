@@ -290,6 +290,68 @@ local function natural_less(a, b)
     return sort_key(a) < sort_key(b)
 end
 
+--- 回退方案：扫描目录计算文件在该文件夹中的位置。
+--- 与旧版一致：只统计同扩展名的文件，按文件名自然排序后定位；
+--- 目录不可读或文件不在列表中时返回 "1 / 1"
+local function scan_folder_position(path)
+    local dir_path, file_name = utils_mod.split_path(path)
+    if not dir_path or dir_path == '' or not file_name or file_name == '' then
+        return '1 / 1'
+    end
+    local ext = file_name:match('%.([^%.\\/]+)$')
+    local filenames = {}
+    local ok, res = pcall(utils_mod.readdir, dir_path, 'files')
+    if ok and type(res) == 'table' then
+        for _, f in ipairs(res) do
+            if f ~= '.' and f ~= '..' then
+                if not ext or f:sub(-#ext - 1) == '.' .. ext then
+                    filenames[#filenames + 1] = f
+                end
+            end
+        end
+    end
+    if #filenames == 0 then return '1 / 1' end
+    table.sort(filenames, natural_less)
+    for i = 1, #filenames do
+        if filenames[i] == file_name then
+            return string.format('%d / %d', i, #filenames)
+        end
+    end
+    return '1 / 1'
+end
+
+--- 从播放列表计算当前文件在同目录中的位置 "i / count"；
+--- 参考同文件夹续播：读 playlist、收集同目录文件、自然排序定位。
+--- 播放列表已包含 >=2 个同目录文件时按列表定位；否则（单文件加载、从历史/收藏菜单
+--- 打开等）播放列表无法反映文件在目录中的真实位置，回退到目录扫描计算。
+local function position_in_folder(path)
+    if not path or path == '' then return '1 / 1' end
+    local dir_path = utils_mod.split_path(path)
+    local playlist = mp.get_property_native('playlist')
+    local same_dir = {}
+    if playlist then
+        for _, item in ipairs(playlist) do
+            if item and item.filename and item.filename ~= '' then
+                local item_dir = utils_mod.split_path(item.filename)
+                if same_path(item_dir, dir_path) then
+                    same_dir[#same_dir + 1] = item.filename
+                end
+            end
+        end
+    end
+    -- 播放列表含 >=2 个同目录文件：autoload 已把整个目录加载进列表，按列表定位即可
+    if #same_dir >= 2 then
+        table.sort(same_dir, natural_less)
+        for i = 1, #same_dir do
+            if same_path(same_dir[i], path) then
+                return string.format('%d / %d', i, #same_dir)
+            end
+        end
+    end
+    -- 播放列表信息不足：回退到目录扫描
+    return scan_folder_position(path)
+end
+
 --- 从播放列表中查找记录条目所在目录的下一个视频路径；
 --- 不依赖播放列表顺序：把同目录文件按文件名自然排序，取该记录之后的第一项。
 --- 返回 next_path 与 found（true = 播放列表已就绪且可确认没有下一集）
@@ -362,6 +424,10 @@ function M.on_unload(hook)
         new_entry.pos = math.floor(pos - 3)
     else
         new_entry.pos = 0
+    end
+    -- 本地文件：从播放列表计算集内位置（供"按来源分组"扁平视图的 hint）
+    if new_entry.path and not new_entry.url then
+        new_entry.pos_in_folder = position_in_folder(new_entry.path)
     end
 end
 

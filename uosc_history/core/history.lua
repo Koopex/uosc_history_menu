@@ -125,10 +125,69 @@ local function norm_key(p)
     return p and p:gsub('\\', '/') or ''
 end
 
+--- 从去重表构建“按来源分组”扁平视图（source_view_flat=true）：
+--- 本地文件按上层目录分组，每组只显示该组最新的一条记录，标题用上层目录
+--- （Season xx 时显示为 "系列 / Season xx"），hint 用数据文件里的集内位置 pos_in_folder；
+--- 删除用 peers 删除整组，收藏/复制用最新记录。URL 始终按域名/IP 构建子菜单，不受此选项影响。
+local function build_flat_source_view(dedup_items)
+    local roots = {}
+    local root_by_key = {}
+
+    for _, item in ipairs(dedup_items) do
+        local value = item.value
+        local path = value and value.path
+        if path and path ~= '' then
+            if value.url then
+                -- URL：与嵌套模式一致，按主机名分组构建子菜单
+                local host = url_host(path) or path
+                local key = 'u:' .. norm_key(host)
+                local root = root_by_key[key]
+                if not root then
+                    root = { id = 'by_folder.' .. key, title = '🔗  ' .. host, items = {} }
+                    table.insert(roots, root)
+                    root_by_key[key] = root
+                end
+                table.insert(root.items, item)
+            else
+                -- 本地文件：按上层目录分组，每组只保留最新的一条记录
+                local upper_path, group_title
+                if our_utils and our_utils.get_folder_info then
+                    upper_path, group_title = our_utils.get_folder_info(path, utils)
+                end
+                local key = 'd:' .. norm_key(upper_path or path)
+                local root = root_by_key[key]
+                if not root then
+                    local gvalue = {}
+                    for k, v in pairs(value) do gvalue[k] = v end
+                    gvalue.peers = {}
+                    for _, p in ipairs(value.peers or {}) do table.insert(gvalue.peers, p) end
+                    root = {
+                        id = 'by_folder.' .. key,
+                        title = '📁  ' .. (group_title or ''),
+                        hint = value.pos_in_folder or '',
+                        value = gvalue,
+                    }
+                    table.insert(roots, root)
+                    root_by_key[key] = root
+                else
+                    -- 收集该目录下所有记录的原始索引，供“删除整组”使用
+                    for _, p in ipairs(value.peers or {}) do
+                        table.insert(root.value.peers, p)
+                    end
+                end
+            end
+        end
+    end
+    return roots
+end
+
 --- 从去重表构建“按来源分组”嵌套视图：
 --- 本地文件按目录归类（父目录为 Season xx 时再向上取一层系列根目录，形成三层菜单），
 --- URL 按域名/IP 归类；叶子节点直接复用去重表条目（图标/hint/value 完全一致）
 local function build_source_view(dedup_items)
+    if config and config.source_view_flat then
+        return build_flat_source_view(dedup_items)
+    end
     local roots = {}
     local root_by_key = {}
     local season_by_key = {}
@@ -206,6 +265,7 @@ local function compute_views()
                 url = entry.url,
                 audio_path = entry.audio_path,
                 media_title = entry.media_title,
+                pos_in_folder = entry.pos_in_folder,
             }
             -- 每个视图叶子都带原始条目索引（peers），搜索/过滤后仍能正确定位
             base_value.peers = { i }

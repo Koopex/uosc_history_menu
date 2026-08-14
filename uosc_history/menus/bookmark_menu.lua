@@ -1,5 +1,5 @@
 -- 收藏菜单：打开/更新/分组选择 + 事件路由
--- 操作：F2 重命名、Ctrl+c 复制、Ctrl+x 剪切、Ctrl+v 粘贴、Del 删除、Ctrl+Home/End/PgUp/PgDw/↑/↓ 排序
+-- 操作：F2 重命名、Ctrl+c 复制、Ctrl+x 剪切、Ctrl+v 粘贴、Ctrl+n 新建分组、Del 删除、Ctrl+Home/End/PgUp/PgDw/↑/↓ 排序
 
 local M = {}
 
@@ -24,7 +24,10 @@ local pending = {
     rename_index = nil,
     paste_target = nil,     -- 单 path 导入：{path, container, index}
     pick_create_path = nil, -- 收藏位置浏览器："新建分组"输入框打开时的分组路径
+    new_group_container = nil, -- 新建分组的目标容器路径（数组），{} = 根
+    new_group_index = nil,     -- 新建分组插入位置：有值则插到选中项之后，否则追加到末尾
     mark_return_pending = false,
+    pending_move = nil,     -- 移动操作：{container=源容器路径, index=源索引}
 }
 
 -- 脚本内复制/剪切标记：{text, mode='cut'|'copy', source=容器路径, source_index=索引}
@@ -44,6 +47,7 @@ end
 function M.set_pending_bookmark(bm)
     pending.pending_bookmark = bm
     pending.pending_playlist = nil
+    pending.pending_move = nil
 end
 
 function M.set_mark_return_pending()
@@ -92,10 +96,12 @@ local function rebuild(container, index, reopen)
     local submenu_id = container and #container > 0 and path_to_id(container) or nil
     M.open(reopen ~= true, submenu_id)
     if index then
+        local sel = index
+        if config.bookmark_new_group_button then sel = index + 1 end
         if submenu_id then
-            mp.commandv('script-message-to', 'uosc', 'select-menu-item', 'bookmarks', tostring(index), submenu_id)
+            mp.commandv('script-message-to', 'uosc', 'select-menu-item', 'bookmarks', tostring(sel), submenu_id)
         else
-            mp.commandv('script-message-to', 'uosc', 'select-menu-item', 'bookmarks', tostring(index))
+            mp.commandv('script-message-to', 'uosc', 'select-menu-item', 'bookmarks', tostring(sel))
         end
     end
 end
@@ -109,17 +115,21 @@ function M.open(update, submenu_id)
     local items = bookmarks.get_menu_items(
         { script_name, 'bookmark_menu_event' },
         {
-            rename = I18N.rename, copy = I18N.copy, cut = I18N.cut, delete = I18N.delete,
+            rename = I18N.rename, copy = I18N.copy, cut = I18N.cut, paste = I18N.paste, move = I18N.move, delete = I18N.delete,
             unknown = I18N.unknown,
             bookmark_footnote = I18N.bookmark_footnote,
+            actions = config.bookmark_actions,
         })
     items = M._enrich_items(items)
     if clip_state and clip_state.mode == 'cut' then
         M._apply_cut_marker(items, clip_state.source, clip_state.source_index)
     end
+    if config.bookmark_new_group_button then
+        items = M._inject_new_group_buttons(items, {})
+    end
     local props = {
         type = 'bookmarks', id = 'bookmarks', title = I18N.title_bookmarks, items = items,
-        on_move = 'callback', on_paste = 'callback', bind_keys = { 'f2', 'ctrl+x' },
+        on_move = 'callback', on_paste = 'callback', bind_keys = { 'f2', 'ctrl+x', 'ctrl+n' },
         callback = { script_name, 'bookmark_menu_event' },
         footnote = I18N.bookmark_footnote,
     }
@@ -145,10 +155,15 @@ function M.toggle()
 end
 
 --- 递归构建收藏位置浏览器菜单树：只列出分组节点，每级顶部为"新建分组/添加到此处"
+--- 顶部操作按钮统一样式：收藏菜单"新建分组"按钮与收藏位置浏览器的两个按钮共用
+local function top_button(title, value, icon)
+    return { title = title, value = value, align = 'center', bold = true, icon = icon }
+end
+
 local function picker_items(container, path_prefix, msg, filter_query, filter_path)
     local items = {
-        { title = msg.create, value = { pick_new_folder = true }, align = 'center' },
-        { title = msg.add_here, value = { pick_add_here = true }, align = 'center', separator = true },
+        top_button(msg.create, { pick_new_folder = true }, 'create_new_folder'),
+        top_button(msg.add_here, { pick_add_here = true }, 'add'),
     }
     local is_filter_level = filter_path and #filter_path == #path_prefix
         and table.concat(filter_path, '.') == table.concat(path_prefix, '.')
@@ -184,7 +199,7 @@ function M.open_picker(update, submenu_id, filter_query, filter_path)
     local props = {
         type = 'pick_folder',
         id = 'pick_folder',
-        title = I18N.select_folder,
+        title = pending.pending_move and I18N.select_move_target or I18N.select_folder,
         items = picker_items(bookmarks.get_entries(), {}, msg, filter_query, filter_path),
         on_search = 'callback',
         search_debounce = 'submit',
@@ -208,6 +223,7 @@ end
 function M.start_add_bookmark(title, value, quick_mark)
     pending.pending_bookmark = { title = title, path = value }
     pending.pending_playlist = nil
+    pending.pending_move = nil
     if quick_mark then M._do_insert({ kind = 'quick' }) else M.open_folder_selector() end
 end
 
@@ -215,6 +231,7 @@ end
 function M.start_add_bookmark_node(node, quick_mark)
     pending.pending_bookmark = node
     pending.pending_playlist = nil
+    pending.pending_move = nil
     if quick_mark then M._do_insert({ kind = 'quick' }) else M.open_folder_selector() end
 end
 
@@ -222,6 +239,7 @@ end
 function M.start_add_playlist(items)
     pending.pending_bookmark = nil
     pending.pending_playlist = items
+    pending.pending_move = nil
     M.open_folder_selector()
 end
 
@@ -229,6 +247,7 @@ end
 function M.add_playlist_quick(items)
     pending.pending_bookmark = nil
     pending.pending_playlist = nil
+    pending.pending_move = nil
     local name = string.format(I18N.playlist_folder_title, os.date('%Y/%m/%d %H:%M'))
     local quick_idx = bookmarks.get_quick_folder_index(I18N.quick_mark_folder)
     local folder_idx = bookmarks.create_folder({quick_idx}, name)
@@ -395,11 +414,30 @@ function M._load_values(value)
     return { path = value, pos = nil }
 end
 
+--- 统一粘贴逻辑：脚本内剪贴板状态命中则移动/复制，否则按导入处理
+local function do_paste(container, index, text)
+    if not text or text == '' then
+        mp.osd_message(I18N.clipboard_empty)
+        return
+    end
+    if clip_state and text == clip_state.text then
+        M._paste_from_clip_state(container, index)
+    else
+        clear_clip_state()
+        M._import(container, index, text)
+    end
+end
+
 -- 事件路由
 M.handlers = {}
 
 function M.handlers.activate(event)
     local a = event.action
+    local v = event.value
+    if type(v) == 'table' and v.new_group then
+        M._show_new_group_dialog(v.path or {})
+        return
+    end
     if a == 'delete' then
         clear_clip_state()
         local container = id_to_path(event.menu_id)
@@ -411,6 +449,11 @@ function M.handlers.activate(event)
         M._copy_or_cut(id_to_path(event.menu_id), event_index(event), 'copy')
     elseif a == 'cut' then
         M._copy_or_cut(id_to_path(event.menu_id), event_index(event), 'cut')
+    elseif a == 'move' then
+        M._start_move(id_to_path(event.menu_id), event_index(event))
+    elseif a == 'paste' then
+        -- 按钮点击不带剪贴板文本，主动读取后走统一粘贴逻辑
+        do_paste(id_to_path(event.menu_id), event_index(event), clipboard and clipboard.get() or '')
     elseif not a then
         if not event.value then return end
         if M.global_actions then M.global_actions.load_file(M._load_values(event.value)) end
@@ -432,14 +475,27 @@ function M.handlers.key(event)
         M._copy_or_cut(container, idx, 'copy')
     elseif event.id == 'ctrl+x' then
         M._copy_or_cut(container, idx, 'cut')
+    elseif event.id == 'ctrl+n' then
+        M._show_new_group_dialog(container, idx)
     end
 end
 
 function M.handlers.move(event)
     clear_clip_state()
     local container = id_to_path(event.menu_id)
-    bookmarks.move_in_container(container, event.from_index, event.to_index)
-    rebuild(container, event.to_index)
+    local from, to = event.from_index, event.to_index
+    if config.bookmark_new_group_button then
+        -- 顶部"新建分组"按钮占据显示索引 1，真实数据索引整体后移一位
+        if from == 1 then return end -- 按钮本身不可排序
+        from = from - 1
+        to = to - 1
+    end
+    local items = bookmarks.resolve_container(container)
+    if not items then return end
+    if from < 1 or from > #items then return end
+    to = math.max(1, math.min(to or 1, #items))
+    bookmarks.move_in_container(container, from, to)
+    rebuild(container, to)
 end
 
 function M.handlers.search(event)
@@ -463,23 +519,21 @@ function M.handlers.search(event)
             mp.osd_message(I18N.imported:format(1))
             rebuild(container, index, true)
         end
+    elseif event.menu_id == 'create_bookmark_folder' then
+        local container = pending.new_group_container or {}
+        local index = pending.new_group_index
+        pending.new_group_container = nil
+        pending.new_group_index = nil
+        if event.query and event.query ~= '' then
+            local pos = index and (index + 1) or (#(bookmarks.resolve_container(container) or {}) + 1)
+            local idx = bookmarks.insert_at(container, pos, { title = event.query, items = {} })
+            if idx then rebuild(container, idx, true) end
+        end
     end
 end
 
 function M.handlers.paste(event)
-    local text = event.value
-    if not text or text == '' then
-        mp.osd_message(I18N.clipboard_empty)
-        return
-    end
-    local container = id_to_path(event.menu_id)
-    local index = event_index(event)
-    if clip_state and text == clip_state.text then
-        M._paste_from_clip_state(container, index)
-    else
-        clear_clip_state()
-        M._import(container, index, text)
-    end
+    do_paste(id_to_path(event.menu_id), event_index(event), event.value)
 end
 --- 复制或剪切选中节点到剪贴板
 function M._copy_or_cut(container, index, mode)
@@ -495,6 +549,84 @@ function M._copy_or_cut(container, index, mode)
     if mode == 'cut' then
         rebuild(container, index)
     end
+end
+
+--- 移动操作：记录源位置并打开收藏位置浏览器选择目标分组
+function M._start_move(container, index)
+    local node = bookmarks.get_at(container, index)
+    if not node then return end
+    pending.pending_move = { container = container, index = index }
+    pending.pending_bookmark = nil
+    pending.pending_playlist = nil
+    M.open_folder_selector()
+end
+
+--- 执行移动：从源容器移除并追加到目标容器末尾（不经过剪贴板）。
+--- 返回 {target_path=调整后目标路径, index=插入索引}；失败返回 nil, 提示文案
+function M._move_node(source_container, source_index, target_path)
+    local node = bookmarks.get_at(source_container, source_index)
+    if not node then return nil, I18N.clipboard_error end
+
+    -- 不能移动到自身子树内（仅文件夹有子树；叶子条目无此问题）
+    local src_path = {}
+    for _, p in ipairs(source_container) do table.insert(src_path, p) end
+    table.insert(src_path, source_index)
+    if type(node.items) == 'table' and bookmarks.is_descendant_path(src_path, target_path) then
+        return nil, I18N.cannot_move_into_self
+    end
+
+    -- 同容器：位置未变化
+    local same_container = #target_path == #source_container
+        and table.concat(target_path, '.') == table.concat(source_container, '.')
+    if same_container then
+        return nil, I18N.no_position_change
+    end
+
+    -- 目标分组本层检查重复（文件夹直接移动，不跨层检查）
+    local target_items = bookmarks.resolve_container(target_path)
+    if not target_items then return nil, I18N.clipboard_error end
+    if node.path ~= nil and bookmarks.has_duplicate_in(target_items, node.path) then
+        return nil, I18N.bookmark_exists
+    end
+
+    -- 先移除源节点，再追加到目标；源在目标前缀容器中时，删除会使目标路径索引前移，需重算
+    bookmarks.remove_at(source_container, source_index)
+    local adjusted = target_path
+    local prefix = #source_container < #target_path
+    for i = 1, #source_container do
+        if source_container[i] ~= target_path[i] then prefix = false break end
+    end
+    if prefix then
+        adjusted = {}
+        for i, v in ipairs(target_path) do
+            if i <= #source_container then
+                adjusted[i] = v
+            elseif i == #source_container + 1 then
+                adjusted[i] = (source_index < v) and (v - 1) or v
+            else
+                adjusted[i] = v
+            end
+        end
+    end
+    local index = bookmarks.append_to(adjusted, node)
+    return { target_path = adjusted, index = index }
+end
+
+--- 收藏位置浏览器选中目标后执行移动，并跳转到目标分组定位新位置
+function M._finish_move(target_path)
+    local mv = pending.pending_move
+    pending.pending_move = nil
+    if not mv then return end
+    local result, err = M._move_node(mv.container, mv.index, target_path)
+    if not result then
+        rebuild(mv.container, mv.index, true)
+        if err then mp.osd_message(err) end
+        return
+    end
+    mp.osd_message(I18N.moved)
+    local target_id = 'bookmarks' .. (#result.target_path > 0 and '.' .. table.concat(result.target_path, '.') or '')
+    M.open(false, target_id)
+    mp.commandv('script-message-to', 'uosc', 'select-menu-item', 'bookmarks', tostring(result.index), target_id)
 end
 
 --- 粘贴脚本内复制/剪切的内容（剪切成功后才删除源节点）
@@ -709,7 +841,7 @@ function M._import(container, index, text)
             initial = our_utils.title_from_path(text) or ''
         end
         mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(
-            builder.input_dialog(I18N.paste_title_hint, { script_name, 'bookmark_menu_event' }, 'paste_title', initial)))
+            builder.input_dialog(I18N.import_title, I18N.paste_title_hint, { script_name, 'bookmark_menu_event' }, 'paste_title', initial)))
         return
     end
     if #nodes == 0 then
@@ -737,13 +869,38 @@ function M._import(container, index, text)
 end
 
 --- 显示重命名输入框（预填当前标题）
+--- 打开新建分组输入框；index 有值则插入到选中项之后（Ctrl+n），否则追加到末尾（顶部按钮）
+function M._show_new_group_dialog(container, index)
+    pending.new_group_container = container
+    pending.new_group_index = index
+    mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(
+        builder.input_dialog(I18N.create_bookmark_folder, I18N.create_folder_tip, { script_name, 'bookmark_menu_event' }, 'create_bookmark_folder')))
+end
+
+--- 配置开启时：在每一层顶部注入"新建分组"按钮（纯 UI 项，不进入数据层；value 携带所在层的数据路径）
+function M._inject_new_group_buttons(list, container)
+    local result = {
+        top_button(I18N.create_bookmark_folder, { new_group = true, path = container }, 'create_new_folder'),
+    }
+    for i, node in ipairs(list) do
+        if node.items then
+            local child = {}
+            for _, p in ipairs(container) do table.insert(child, p) end
+            table.insert(child, i)
+            node.items = M._inject_new_group_buttons(node.items, child)
+        end
+        table.insert(result, node)
+    end
+    return result
+end
+
 function M._show_rename_dialog(container, index)
     local node = bookmarks.get_at(container, index)
     if not node then return end
     pending.rename_container = container
     pending.rename_index = index
     mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(
-        builder.input_dialog(I18N.rename_bookmark_hint, { script_name, 'bookmark_menu_event' }, 'rename_bookmark',
+        builder.input_dialog(I18N.rename_title, I18N.rename_bookmark_hint, { script_name, 'bookmark_menu_event' }, 'rename_bookmark',
             node.title or '')))
 end
 
@@ -757,9 +914,13 @@ function M.pick_handlers.activate(event)
         -- 两步"新建分组"：先记录当前位置，打开命名输入框
         pending.pick_create_path = pick_id_to_path(event.menu_id)
         mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(
-            builder.input_dialog(I18N.create_folder_tip, { script_name, 'bookmark_pick_event' }, 'pick_create_folder')))
+            builder.input_dialog(I18N.create_bookmark_folder, I18N.create_folder_tip, { script_name, 'bookmark_pick_event' }, 'pick_create_folder')))
     elseif v.pick_add_here then
-        M._do_insert({ kind = 'path', path = pick_id_to_path(event.menu_id) })
+        if pending.pending_move then
+            M._finish_move(pick_id_to_path(event.menu_id))
+        else
+            M._do_insert({ kind = 'path', path = pick_id_to_path(event.menu_id) })
+        end
     end
 end
 

@@ -223,14 +223,22 @@ function M.clear()
     M.invalidate_cache()
 end
 
---- 叶子条目操作按钮
+--- 叶子条目操作按钮（顺序由 msg.actions 决定；快捷键始终可用）
 local function leaf_actions(msg)
-    return {
-        { name = 'rename', icon = 'edit', label = msg.rename },
-        { name = 'copy', icon = 'content_copy', label = msg.copy },
-        { name = 'cut', icon = 'content_cut', label = msg.cut },
-        { name = 'delete', icon = 'delete', label = msg.delete },
+    local defs = {
+        rename = { icon = 'edit', label = msg.rename },
+        copy   = { icon = 'content_copy', label = msg.copy },
+        cut    = { icon = 'content_cut', label = msg.cut },
+        paste  = { icon = 'content_paste', label = msg.paste },
+        move   = { icon = 'drive_file_move', label = msg.move },
+        delete = { icon = 'delete', label = msg.delete },
     }
+    local actions = {}
+    for _, name in ipairs(msg.actions or {}) do
+        local def = defs[name]
+        if def then actions[#actions + 1] = { name = name, icon = def.icon, label = def.label } end
+    end
+    return actions
 end
 
 --- 递归构建菜单项：文件夹（带 items）→ 子菜单（显式 id=索引路径），条目 → 直接项（含操作按钮）
