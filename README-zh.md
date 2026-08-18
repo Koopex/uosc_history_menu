@@ -63,7 +63,7 @@
 | `max_entries` | `0` | 播放记录最多保存条数（`0` = 不限制） |
 | `bookmark_new_group_button` | `no` | 收藏夹每层顶部显示"新建分组"按钮 |
 | `history_actions` | `mark,delete` | 历史记录条目操作按钮（逗号分隔，留空则不显示，快捷键仍可用） |
-| `bookmark_actions` | `rename,move,delete` | 收藏条目操作按钮（逗号分隔，留空则不显示，快捷键仍可用） |
+| `bookmark_actions` | `rename,delete,[]` | 收藏条目操作按钮（逗号分隔，留空则不显示，快捷键仍可用）。支持分组语法 `[a,b,c]`：组内操作折叠为一个“更多操作”按钮；`[]` 等效于自动补充未显示的操作 |
 | `data_path` | `~~/uosc_history.json` | 播放记录数据文件 |
 | `bookmark_path` | *(空)* | 收藏夹独立文件；留空则与记录存于同一文件 |
 

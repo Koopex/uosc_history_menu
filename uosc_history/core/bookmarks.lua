@@ -9,10 +9,13 @@ local entries = {}
 -- 缓存的菜单项
 local menu_items_cache = nil
 
+local utils
+
 --- 用加载的数据初始化
 function M.init(params)
     params = params or {}
     entries = params.entries or {}
+    utils = params.utils
     M.invalidate_cache()
 end
 
@@ -224,7 +227,8 @@ function M.clear()
 end
 
 --- 叶子条目操作按钮（顺序由 msg.actions 决定；快捷键始终可用）
-local function leaf_actions(msg)
+--- 支持分组语法：[a,b,c] 折叠为一个“更多操作”按钮；空分组 [] 等效于自动补充未显示的操作
+local function leaf_actions(msg, path)
     local defs = {
         rename = { icon = 'edit', label = msg.rename },
         copy   = { icon = 'content_copy', label = msg.copy },
@@ -232,11 +236,43 @@ local function leaf_actions(msg)
         paste  = { icon = 'content_paste', label = msg.paste },
         move   = { icon = 'drive_file_move', label = msg.move },
         delete = { icon = 'delete', label = msg.delete },
+        new_group = { icon = 'create_new_folder', label = msg.new_group },
+        more   = { icon = 'more_horiz', label = msg.more },
     }
+    local function more_button(name)
+        local label = utils and utils.footnote_label(defs.more.label, path) or defs.more.label
+        return { name = name, icon = defs.more.icon, label = label }
+    end
+    -- 统计已配置的操作数（直接按钮 + 分组内），[] 在全部操作都已配置时不显示
+    local configured = {}
+    for _, token in ipairs(msg.actions or {}) do
+        if type(token) == 'table' then
+            for _, n in ipairs(token) do configured[n] = true end
+        elseif defs[token] then
+            configured[token] = true
+        end
+    end
+    local op_count = 0
+    for _ in pairs(configured) do op_count = op_count + 1 end
     local actions = {}
-    for _, name in ipairs(msg.actions or {}) do
-        local def = defs[name]
-        if def then actions[#actions + 1] = { name = name, icon = def.icon, label = def.label } end
+    for _, token in ipairs(msg.actions or {}) do
+        if type(token) == 'table' then
+            if #token > 0 then
+                -- 分组 [a,b,c]：折叠为一个“更多操作”按钮，点击后展开该组操作
+                actions[#actions + 1] = more_button('more:' .. table.concat(token, ','))
+            elseif op_count < 7 then
+                -- 空分组 []：等效于 more，自动补充未显示的操作
+                actions[#actions + 1] = more_button('more')
+            end
+        elseif defs[token] then
+            local def = defs[token]
+            -- 粘贴按钮不显示路径，其余按钮悬停时在 footnote 显示路径
+            local label = def.label
+            if token ~= 'paste' then
+                label = utils and utils.footnote_label(def.label, path) or def.label
+            end
+            actions[#actions + 1] = { name = token, icon = def.icon, label = label }
+        end
     end
     return actions
 end
@@ -266,7 +302,7 @@ local function build_menu_items(list, callback_table, msg, path_prefix)
                     id = id,
                     title = node.title or (msg.unknown or 'Unknown'),
                     value = node.path,
-                    actions = leaf_actions(msg),
+                    actions = leaf_actions(msg, node.path),
                 })
             end
         end

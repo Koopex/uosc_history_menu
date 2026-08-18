@@ -1,5 +1,5 @@
 local M = {
-    del = 'Delete this record',
+    del = 'Delete',
     title_all = 'All Records',
     title_dedup = 'Recent Media',
     title_folders = 'By Source',
@@ -14,6 +14,9 @@ local M = {
     quick_mark_enable = 'Quick Bookmark: ON',
     quick_mark_disable = 'Quick Bookmark: OFF',
     create_bookmark_folder = 'Create a new group',
+    create_folder_below = 'New group',
+    more_actions = 'More actions',
+    back = 'Back',
     create_folder_tip = 'Type and press Enter to create',
     add_here = 'Add here',
     bookmark_exists = 'Bookmark already exists',

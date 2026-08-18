@@ -97,7 +97,7 @@ local shared_params = {
 }
 
 history.init({entries = {}, opts = {log = true, filter = 'recent', quick_mark = false}, config = config, utils = utils, i18n = I18N})
-bookmarks.init({entries = {}})
+bookmarks.init({entries = {}, utils = utils})
 clipboard.init({ mp = mp, utils = mp_utils })
 
 builder.init({script_name = script_name})
@@ -106,6 +106,7 @@ history_menu.init(merge(shared_params, {
     history = history,
     builder = builder,
     clipboard = clipboard,
+    our_utils = utils,
 }))
 
 bookmark_menu.init(merge(shared_params, {
@@ -172,9 +173,9 @@ local function load_data()
         history.init({entries = data.entries or {}, opts = opts, config = config, utils = utils, i18n = I18N})
         if config.bookmark_path and config.bookmark_path ~= '' then
             -- 独立收藏文件：不存在或为空时从主文件增量迁移
-            bookmarks.init({entries = storage.load_bookmarks(config.bookmark_path, data.bookmark_entries or {})})
+            bookmarks.init({entries = storage.load_bookmarks(config.bookmark_path, data.bookmark_entries or {}), utils = utils})
         else
-            bookmarks.init({entries = data.bookmark_entries or {}})
+            bookmarks.init({entries = data.bookmark_entries or {}, utils = utils})
         end
 
         if opts.log ~= nil then config.log = opts.log end

@@ -94,7 +94,10 @@ end
 --- 重建菜单并定位：reopen=true 时用 open-menu（收藏菜单已被对话框替换时）
 local function rebuild(container, index, reopen)
     local submenu_id = container and #container > 0 and path_to_id(container) or nil
-    M.open(reopen ~= true, submenu_id)
+    -- 收藏菜单未处于打开状态（被对话框/更多操作菜单覆盖）时改用 open-menu 重新打开
+    local current_type = mp.get_property_native('user-data/uosc/menu/type')
+    local need_open = reopen or current_type ~= 'bookmarks'
+    M.open(not need_open, submenu_id)
     if index then
         local sel = index
         if config.bookmark_new_group_button then sel = index + 1 end
@@ -116,6 +119,8 @@ function M.open(update, submenu_id)
         { script_name, 'bookmark_menu_event' },
         {
             rename = I18N.rename, copy = I18N.copy, cut = I18N.cut, paste = I18N.paste, move = I18N.move, delete = I18N.delete,
+            new_group = I18N.create_folder_below,
+            more = I18N.more_actions,
             unknown = I18N.unknown,
             bookmark_footnote = I18N.bookmark_footnote,
             actions = config.bookmark_actions,
@@ -434,6 +439,10 @@ M.handlers = {}
 function M.handlers.activate(event)
     local a = event.action
     local v = event.value
+    if event.menu_id == 'bookmark_more' then
+        M._handle_more_activate(event)
+        return
+    end
     if type(v) == 'table' and v.new_group then
         M._show_new_group_dialog(v.path or {})
         return
@@ -454,6 +463,15 @@ function M.handlers.activate(event)
     elseif a == 'paste' then
         -- 按钮点击不带剪贴板文本，主动读取后走统一粘贴逻辑
         do_paste(id_to_path(event.menu_id), event_index(event), clipboard and clipboard.get() or '')
+    elseif a == 'new_group' then
+        M._show_new_group_dialog(id_to_path(event.menu_id), event_index(event))
+    elseif a == 'more' or (type(a) == 'string' and a:sub(1, 5) == 'more:') then
+        local ops
+        if type(a) == 'string' and a:sub(1, 5) == 'more:' then
+            ops = {}
+            for op in a:sub(6):gmatch('[^,]+') do ops[#ops + 1] = op end
+        end
+        M._open_more_menu(id_to_path(event.menu_id), event_index(event), ops)
     elseif not a then
         if not event.value then return end
         if M.global_actions then M.global_actions.load_file(M._load_values(event.value)) end
@@ -462,6 +480,7 @@ function M.handlers.activate(event)
 end
 
 function M.handlers.key(event)
+    if event.menu_id == 'bookmark_more' then return end
     local idx = event_index(event)
     if not idx then return end
     local container = id_to_path(event.menu_id)
@@ -481,6 +500,7 @@ function M.handlers.key(event)
 end
 
 function M.handlers.move(event)
+    if event.menu_id == 'bookmark_more' then return end
     clear_clip_state()
     local container = id_to_path(event.menu_id)
     local from, to = event.from_index, event.to_index
@@ -499,6 +519,7 @@ function M.handlers.move(event)
 end
 
 function M.handlers.search(event)
+    if event.menu_id == 'bookmark_more' then return end
     if event.menu_id == 'rename_bookmark' and event.query and event.query ~= '' then
         local container = pending.rename_container or {}
         local index = pending.rename_index
@@ -533,7 +554,104 @@ function M.handlers.search(event)
 end
 
 function M.handlers.paste(event)
+    if event.menu_id == 'bookmark_more' then return end
     do_paste(id_to_path(event.menu_id), event_index(event), event.value)
+end
+
+--- "更多操作"菜单的操作定义（完整列表，与收藏条目可用按钮一致）
+local function more_op_defs()
+    return {
+        rename    = { icon = 'edit', label = I18N.rename },
+        copy      = { icon = 'content_copy', label = I18N.copy },
+        cut       = { icon = 'content_cut', label = I18N.cut },
+        paste     = { icon = 'content_paste', label = I18N.paste },
+        move      = { icon = 'drive_file_move', label = I18N.move },
+        delete    = { icon = 'delete', label = I18N.delete },
+        new_group = { icon = 'create_new_folder', label = I18N.create_folder_below },
+    }
+end
+
+--- 打开“更多操作”菜单：ops 为分组指定的操作；nil 时自动补充未显示的操作。最后一项“返回”
+function M._open_more_menu(container, index, ops)
+    pending.more_context = { container = container or {}, index = index }
+    local defs = more_op_defs()
+    local items = {}
+    for _, name in ipairs(ops or M._auto_more_ops()) do
+        local def = defs[name]
+        if def then
+            items[#items + 1] = { title = def.label, icon = def.icon, value = { more_op = name } }
+        end
+    end
+    items[#items + 1] = { title = I18N.back, icon = 'arrow_back', value = { more_back = true } }
+    mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({
+        type = 'bookmark_more',
+        id = 'bookmark_more',
+        title = I18N.more_actions,
+        items = items,
+        search_style = 'disabled',
+        callback = { script_name, 'bookmark_menu_event' },
+    }))
+end
+
+--- 空分组 [] 的自动补充：列出未以按钮显示的操作（分组内操作视为已显示）
+function M._auto_more_ops()
+    local shown = {}
+    for _, token in ipairs(config.bookmark_actions or {}) do
+        if type(token) == 'table' then
+            for _, n in ipairs(token) do shown[n] = true end
+        else
+            shown[token] = true
+        end
+    end
+    local ops = {}
+    for _, name in ipairs({ 'rename', 'copy', 'cut', 'paste', 'move', 'delete', 'new_group' }) do
+        if not shown[name] then ops[#ops + 1] = name end
+    end
+    return ops
+end
+
+--- 从"更多操作"菜单返回收藏菜单并选中原条目
+function M._return_from_more()
+    local ctx = pending.more_context
+    pending.more_context = nil
+    if not ctx then return end
+    rebuild(ctx.container or {}, ctx.index, true)
+end
+
+--- "更多操作"菜单条目点击：执行对应操作（操作完成后回到收藏菜单）
+function M._handle_more_activate(event)
+    local v = event.value
+    if not v then return end
+    if v.more_back then
+        M._return_from_more()
+        return
+    end
+    local ctx = pending.more_context
+    if not (v.more_op and ctx) then return end
+    local container = ctx.container or {}
+    local index = ctx.index
+    if v.more_op == 'rename' then
+        M._show_rename_dialog(container, index)
+    elseif v.more_op == 'delete' then
+        clear_clip_state()
+        bookmarks.remove_at(container, index)
+        -- 删除后定位回原位：同索引下一项；末尾则选新末项
+        local count = #(bookmarks.resolve_container(container) or {})
+        local sel = count > 0 and math.min(index, count) or nil
+        rebuild(container, sel, true)
+    elseif v.more_op == 'copy' then
+        M._copy_or_cut(container, index, 'copy')
+        M._return_from_more()
+    elseif v.more_op == 'cut' then
+        M._copy_or_cut(container, index, 'cut')
+        -- _copy_or_cut 内部已重建菜单（带剪切标记）
+    elseif v.more_op == 'paste' then
+        do_paste(container, index, clipboard and clipboard.get() or '')
+    elseif v.more_op == 'move' then
+        M._start_move(container, index)
+    elseif v.more_op == 'new_group' then
+        M._show_new_group_dialog(container, index)
+    end
 end
 --- 复制或剪切选中节点到剪贴板
 function M._copy_or_cut(container, index, mode)

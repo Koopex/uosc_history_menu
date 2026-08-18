@@ -1,5 +1,5 @@
 local M = {
-    del = '删除记录',
+    del = '删除',
     title_all = '全部记录',
     title_dedup = '播放记录',
     title_folders = '按来源分组',
@@ -14,6 +14,9 @@ local M = {
     quick_mark_enable = '快速收藏: 开',
     quick_mark_disable = '快速收藏: 关',
     create_bookmark_folder = '新建分组',
+    create_folder_below = '新建分组',
+    more_actions = '更多操作',
+    back = '返回',
     create_folder_tip = '输入名称后回车创建',
     add_here = '添加到此处',
     bookmark_exists = '已经收藏过了',

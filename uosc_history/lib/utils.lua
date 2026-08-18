@@ -79,4 +79,10 @@ function M.title_from_path(path)
     return name
 end
 
+--- 构造按钮悬停说明：第一行按钮说明，第二行直接显示完整路径（不折行、不截断）
+function M.footnote_label(label, path)
+    if not path or path == '' then return label end
+    return label .. '\n' .. path
+end
+
 return M

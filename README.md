@@ -63,7 +63,7 @@ Edit `script-opts/uosc_history.conf`:
 | `max_entries` | `0` | Max history entries kept (`0` = unlimited) |
 | `bookmark_new_group_button` | `no` | Show a "New Group" button at the top of every bookmarks level |
 | `history_actions` | `mark,delete` | Action buttons for history entries (comma-separated; empty = none, shortcuts still work) |
-| `bookmark_actions` | `rename,move,delete` | Action buttons for bookmark entries (comma-separated; empty = none, shortcuts still work) |
+| `bookmark_actions` | `rename,delete,[]` | Action buttons for bookmark entries (comma-separated; empty = none, shortcuts still work). Group syntax `[a,b,c]` collapses the listed actions into a “More actions” button; `[]` auto-fills actions not shown as buttons |
 | `data_path` | `~~/uosc_history.json` | History data file |
 | `bookmark_path` | *(empty)* | Separate bookmark file; empty = same file as `data_path` |
 

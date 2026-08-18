@@ -24,38 +24,63 @@ local defaults = {
     -- 搜索结果按播放时间排序
     search_sorting = false,
 
-    -- 收藏夹每层顶部显示"新建分组"按钮
-    bookmark_new_group_button = false,
-
     -- 历史记录条目操作按钮（逗号分隔，按显示顺序；留空 = 不显示按钮，快捷键仍可用）
-    -- 可用值：mark（收藏）、copy（复制）、delete（删除）
+    -- 可用值：mark（收藏）,copy（复制）,delete（删除）
     history_actions = 'mark,delete',
 
     -- 收藏条目操作按钮（逗号分隔，按显示顺序；留空 = 不显示按钮，快捷键仍可用）
-    -- 可用值：rename（重命名）、copy（复制）、cut（剪切）、paste（粘贴）、move（移动）、delete（删除）
-    bookmark_actions = 'rename,move,delete',
+    -- 可用值：new_group（新建分组）,rename（重命名）,move（移动）,copy（复制）,cut（剪切）,paste（粘贴）,delete（删除）
+    -- 分组语法：[move,copy,cut] 会把组内操作折叠为一个“更多操作”按钮；空分组 [] 等效于自动补充未显示的操作
+    bookmark_actions = 'rename,delete,[]',
+
+    -- 收藏夹每层顶部显示"新建分组"按钮
+    bookmark_new_group_button = false,
+
+    -- 历史记录最大保存条数（0 = 不限制，默认值；设为正数后超出部分裁掉最旧记录）
+    max_entries = 0,
 
     -- 日志文件路径（~~/ = 用户 home 目录）
     data_path = '~~/uosc_history.json',
 
     -- 收藏夹独立存储文件路径；留空则与历史记录存于同一文件（data_path）
     bookmark_path = '',
-
-    -- 历史记录最大保存条数（0 = 不限制，默认值；设为正数后超出部分裁掉最旧记录）
-    max_entries = 0,
 }
 
 local M = {}
 
 -- 所有可用的操作按钮名称（未知名称在解析时被过滤）
-local known_actions = { mark = true, delete = true, rename = true, copy = true, cut = true, paste = true, move = true }
+local known_actions = { mark = true, delete = true, rename = true, copy = true, cut = true, paste = true, move = true, new_group = true }
 
---- 解析逗号分隔的操作按钮列表：过滤未知名称，返回按显示顺序排列的数组
+--- 解析逗号分隔的操作按钮列表：支持分组语法 [a,b,c]（组内操作折叠为“更多操作”按钮；空分组 [] 等效于 more）
+--- 返回 token 数组：字符串 = 单按钮；table = 分组（空表表示自动补充未显示的操作）
 local function parse_actions(str)
     local list = {}
-    if type(str) == 'string' then
-        for name in str:gmatch('[^,%s]+') do
+    if type(str) ~= 'string' then return list end
+    local pos, len = 1, #str
+    while pos <= len do
+        local c = str:sub(pos, pos)
+        if c == '[' then
+            local close = str:find(']', pos + 1, true)
+            if not close then break end
+            local content = str:sub(pos + 1, close - 1)
+            local group = {}
+            for name in content:gmatch('[^%[%],%s]+') do
+                if known_actions[name] then group[#group + 1] = name end
+            end
+            -- 空分组 []（或仅含空白）留下作为空表（自动补充）；全部为未知项的分组直接忽略
+            if content:match('%S') then
+                if #group > 0 then list[#list + 1] = group end
+            else
+                list[#list + 1] = group
+            end
+            pos = close + 1
+        elseif c == ',' or c:match('%s') then
+            pos = pos + 1
+        else
+            local name = str:match('[^,%s]+', pos)
+            if not name then break end
             if known_actions[name] then list[#list + 1] = name end
+            pos = pos + #name
         end
     end
     return list

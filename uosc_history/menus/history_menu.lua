@@ -10,6 +10,7 @@ local config
 local history    -- 历史数据模块
 local builder    -- 菜单构造器
 local clipboard  -- 剪贴板
+local our_utils  -- 本地纯函数工具（lib/utils.lua）
 
 -- 由 main.lua 注入
 M.global_actions = nil
@@ -24,28 +25,17 @@ function M.init(params)
     history = params.history
     builder = params.builder
     clipboard = params.clipboard
+    our_utils = params.our_utils
 end
 
 -----------------------------------------------------------------------------
 -- 菜单打开/更新 ------------------------------------------------------------
 -----------------------------------------------------------------------------
 
---- 递归为来源分组视图的子菜单节点补充回调/操作按钮
----（uosc 会把子菜单节点上的这些字段继承到打开的下一级菜单）
-local function enrich_submenus(list, item_actions)
-    for _, it in ipairs(list) do
-        if it.items then
-            it.callback = { script_name, 'history_menu_event' }
-            it.item_actions = item_actions
-            it.footnote = I18N.footnote
-            enrich_submenus(it.items, item_actions)
-        end
-    end
-end
-
 --- 根据配置的操作按钮列表构建 uosc 按钮（顺序即显示顺序）
+--- label 附加条目路径：悬停按钮时 uosc 在底部 footnote 显示"按钮名 + 换行 + 完整路径"
 --- 按钮定义在调用时构造，避免模块加载期引用尚未注入的 I18N
-local function build_actions(list)
+local function build_actions(list, path)
     local defs = {
         mark   = { icon = 'star', label = I18N.bookmark_add },
         copy   = { icon = 'content_copy', label = I18N.copy },
@@ -54,9 +44,29 @@ local function build_actions(list)
     local actions = {}
     for _, name in ipairs(list or {}) do
         local def = defs[name]
-        if def then actions[#actions + 1] = { name = name, icon = def.icon, label = def.label } end
+        if def then
+            actions[#actions + 1] = {
+                name = name,
+                icon = def.icon,
+                label = our_utils and our_utils.footnote_label(def.label, path) or def.label,
+            }
+        end
     end
     return actions
+end
+
+--- 递归为叶子条目附加带路径说明的操作按钮；
+--- 子菜单节点补充回调/footnote（uosc 会把子菜单节点上的这些字段继承到打开的下一级菜单）
+local function attach_item_actions(list)
+    for _, it in ipairs(list) do
+        if it.items then
+            it.callback = { script_name, 'history_menu_event' }
+            it.footnote = I18N.footnote
+            attach_item_actions(it.items)
+        elseif it.value and it.value.path then
+            it.actions = build_actions(config.history_actions, it.value.path)
+        end
+    end
 end
 
 --- 构造历史菜单属性（open/update 共用）
@@ -76,9 +86,7 @@ local function build_props(filter, select_index)
     end
 
     local item_actions = build_actions(config.history_actions)
-    if filter == 'by_folder' then
-        enrich_submenus(items, item_actions)
-    end
+    attach_item_actions(items)
 
     local menu_props = {
         type = 'history',
@@ -133,6 +141,8 @@ local function build_search_props(results, select_index, filter)
     if filter == 'all' then prefix = I18N.title_all
     elseif filter == 'by_folder' then prefix = I18N.title_folders
     else prefix = I18N.title_dedup end
+
+    attach_item_actions(results)
 
     return {
         type = 'history',
