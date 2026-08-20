@@ -1,9 +1,8 @@
 -- 收藏夹数据模型
--- 管理收藏夹分组和条目（支持任意层级嵌套）
+-- 管理收藏夹分组和条目
 
 local M = {}
 
--- entries: 顶层数组，元素可为文件夹 {title, items={...}} 或条目 {title, path}
 local entries = {}
 
 -- 缓存的菜单项
@@ -229,14 +228,16 @@ end
 --- 叶子条目操作按钮（顺序由 msg.actions 决定；快捷键始终可用）
 --- 支持分组语法：[a,b,c] 折叠为一个“更多操作”按钮；空分组 [] 等效于自动补充未显示的操作
 local function leaf_actions(msg, path)
+    local KEYS = utils and utils.KEYS or {}
     local defs = {
-        rename = { icon = 'edit', label = msg.rename },
-        copy   = { icon = 'content_copy', label = msg.copy },
-        cut    = { icon = 'content_cut', label = msg.cut },
-        paste  = { icon = 'content_paste', label = msg.paste },
-        move   = { icon = 'drive_file_move', label = msg.move },
-        delete = { icon = 'delete', label = msg.delete },
-        new_group = { icon = 'create_new_folder', label = msg.new_group },
+        rename = { icon = 'edit', label = msg.rename, key = KEYS.rename },
+        copy   = { icon = 'content_copy', label = msg.copy, key = KEYS.copy },
+        cut    = { icon = 'content_cut', label = msg.cut, key = KEYS.cut },
+        paste  = { icon = 'content_paste', label = msg.paste, key = KEYS.paste },
+        move   = { icon = 'drive_file_move', label = msg.move, key = KEYS.move },
+        delete = { icon = 'delete', label = msg.delete, key = KEYS.delete },
+        new_group = { icon = 'create_new_folder', label = msg.new_group, key = KEYS.new_group },
+        playlist = { icon = 'playlist_add', label = msg.add_to_playlist, key = KEYS.add_to_playlist },
         more   = { icon = 'more_horiz', label = msg.more },
     }
     local function more_button(name)
@@ -260,16 +261,17 @@ local function leaf_actions(msg, path)
             if #token > 0 then
                 -- 分组 [a,b,c]：折叠为一个“更多操作”按钮，点击后展开该组操作
                 actions[#actions + 1] = more_button('more:' .. table.concat(token, ','))
-            elseif op_count < 7 then
+            elseif op_count < 8 then
                 -- 空分组 []：等效于 more，自动补充未显示的操作
                 actions[#actions + 1] = more_button('more')
             end
         elseif defs[token] then
             local def = defs[token]
+            -- label 第一行显示"操作 (快捷键)"，再附加路径
+            local label = def.key and (def.label .. ' (' .. def.key .. ')') or def.label
             -- 粘贴按钮不显示路径，其余按钮悬停时在 footnote 显示路径
-            local label = def.label
             if token ~= 'paste' then
-                label = utils and utils.footnote_label(def.label, path) or def.label
+                label = utils and utils.footnote_label(label, path) or label
             end
             actions[#actions + 1] = { name = token, icon = def.icon, label = label }
         end
@@ -308,6 +310,70 @@ local function build_menu_items(list, callback_table, msg, path_prefix)
         end
     end
     return result
+end
+
+--- 展平容器下的叶子条目（按菜单顺序）：mode='siblings' 只取容器直接子项；mode='subtree' 递归整棵子树
+--- 返回 {leaves = 叶子节点数组, clicked = 点击条目在 leaves 中的位置}；找不到或容器无效时 clicked = 0
+function M.flatten_around(path_list, index, mode)
+    local container = M.resolve_container(path_list)
+    if not container or not container[index] or type(container[index]) ~= 'table' then
+        return { leaves = {}, clicked = 0 }
+    end
+    local clicked = container[index]
+    local leaves = {}
+    local clicked_pos = 0
+    local function add(node)
+        leaves[#leaves + 1] = node
+        if node == clicked then clicked_pos = #leaves end
+    end
+    local function walk(list)
+        for _, node in ipairs(list) do
+            if type(node) == 'table' then
+                if node.items ~= nil then
+                    if mode == 'subtree' then walk(node.items) end
+                elseif node.path ~= nil and node.path ~= '' then
+                    add(node)
+                end
+            end
+        end
+    end
+    if mode == 'subtree' then
+        walk(container)
+    else
+        for _, node in ipairs(container) do
+            if type(node) == 'table' and node.path ~= nil and node.path ~= '' then add(node) end
+        end
+    end
+    return { leaves = leaves, clicked = clicked_pos }
+end
+
+--- 收集分组节点下的叶子条目（path_list 指向分组节点）：mode='subtree' 递归整棵子树，
+--- 其他模式只取第一层的叶子条目。返回叶子节点数组
+function M.collect_leaves(path_list, mode)
+    local container = M.resolve_container(path_list)
+    if not container then return {} end
+    local leaves = {}
+    local function walk(list)
+        for _, node in ipairs(list) do
+            if type(node) == 'table' then
+                if node.items ~= nil then
+                    if mode == 'subtree' then walk(node.items) end
+                elseif node.path ~= nil and node.path ~= '' then
+                    leaves[#leaves + 1] = node
+                end
+            end
+        end
+    end
+    if mode == 'subtree' then
+        walk(container)
+    else
+        for _, node in ipairs(container) do
+            if type(node) == 'table' and node.path ~= nil and node.path ~= '' then
+                leaves[#leaves + 1] = node
+            end
+        end
+    end
+    return leaves
 end
 
 --- 构建并返回菜单项（支持任意层级嵌套：文件夹 ↔ 条目混合）

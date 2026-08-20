@@ -19,10 +19,7 @@ local new_entry = nil
 local loaded = false      -- 首次 file-loaded 后为 true，防止重复触发 resume_in_folder
 local from_record = false -- 通过历史/收藏菜单加载时为 true
 local auto_next = false   -- 自动跳转下一集后，跳过本次同文件夹检查
--- 同文件夹续播的“续播下一集”轮询：需要下一集但播放列表未就绪时使用
-local resume_poll = nil
--- 脚本加载时设置的 force-media-title 是否仍在等待本次播放消费
-local force_title_set = false
+local group_playlist = false -- 脚本构建的分组连播播放中：抑制"同文件夹续播"提示
 -- 同文件夹续播提示：每个 mpv 会话只检查一次，避免播放下一集时反复提示续播上一集
 local resume_prompted = false
 
@@ -193,47 +190,14 @@ local function show_resume_menu(target, target_hint, target_is_next, peer)
     end
 end
 
---- 轮询等待播放列表生成（autoload）后再取“下一集”；最多约 5 秒，
---- 超时则退回“恢复该集”提示
-local function resume_next_tick()
-    local poll = resume_poll
-    if not poll then return end
-    poll.timer = nil
-    if new_entry ~= poll.current then
-        resume_poll = nil -- 已切换到其他文件，放弃
-        return
-    end
-    local next_path, found = M._find_next_in_folder(poll.entry)
-    if next_path then
-        resume_poll = nil
-        show_resume_menu(build_next_target(next_path), I18N.from_start, true, poll.peer)
-        return
-    end
-    if found then
-        resume_poll = nil -- 播放列表已就绪且该集是最后一集：不提示
-        return
-    end
-    if poll.ticks < 25 then
-        poll.ticks = poll.ticks + 1
-        poll.timer = mp.add_timeout(0.2, resume_next_tick)
-        return
-    end
-    -- 轮询超时仍无播放列表：按“快要播完的那集”提示恢复；
-    -- 打开的就是该记录本身时无法确认下一集，不提示
-    resume_poll = nil
-    if not same_path(poll.entry.path, new_entry.path) then
-        show_resume_menu(poll.entry, entry_hint(poll.entry), false, poll.peer)
-    end
-end
-
 --- 处理本地文件条目
 function M._handle_local_file()
     if auto_next then
         auto_next = false
-    elseif not loaded and not from_record and not resume_prompted and config.resume_in_folder then
+    elseif not loaded and not from_record and not resume_prompted and not group_playlist and config.resume_in_folder then
         -- 每个 mpv 会话只检查一次，避免播放下一集时反复提示续播上一集
         resume_prompted = true
-        -- 先立即检查是否需要续播；只有“续播下一集”才需要等播放列表就绪
+        -- 立即检查是否需要续播；“续播下一集”直接 readdir 扫描目录，无需等播放列表
         M._check_resume_in_folder()
     end
 end
@@ -267,17 +231,19 @@ function M._check_resume_in_folder()
     end
 end
 
---- 续播目标需要“下一集”时：立即查播放列表；未找到则轮询等待，
---- 列表就绪且该集是最后一集则不提示，轮询超时退回“恢复该集”提示
+--- 续播目标需要“下一集”时：用 readdir 直接扫描记录所在目录；
+--- 扫描失败或记录不在目录中时退回“恢复该集”提示
 function M._offer_resume_next(entry, peer)
     local next_path, found = M._find_next_in_folder(entry)
     if next_path then
         show_resume_menu(build_next_target(next_path), I18N.from_start, true, peer)
         return
     end
-    if found then return end -- 播放列表已就绪且该集是最后一集：不提示
-    resume_poll = { entry = entry, current = new_entry, peer = peer, ticks = 0 }
-    resume_next_tick()
+    if found then return end -- 扫描成功且该集是最后一个媒体文件：不提示
+    -- 无法确认下一集：按“快要播完的那集”提示恢复；打开的就是该记录本身时不提示
+    if not same_path(entry.path, new_entry.path) then
+        show_resume_menu(entry, entry_hint(entry), false, peer)
+    end
 end
 
 --- 自然比较（数字段按数值大小）：让 "E9" 排在 "E10" 之前
@@ -290,101 +256,49 @@ local function natural_less(a, b)
     return sort_key(a) < sort_key(b)
 end
 
---- 回退方案：扫描目录计算文件在该文件夹中的位置。
---- 与旧版一致：只统计同扩展名的文件，按文件名自然排序后定位；
---- 目录不可读或文件不在列表中时返回 "1 / 1"
-local function scan_folder_position(path)
-    local dir_path, file_name = utils_mod.split_path(path)
-    if not dir_path or dir_path == '' or not file_name or file_name == '' then
-        return '1 / 1'
-    end
-    local ext = file_name:match('%.([^%.\\/]+)$')
-    local filenames = {}
-    local ok, res = pcall(utils_mod.readdir, dir_path, 'files')
-    if ok and type(res) == 'table' then
-        for _, f in ipairs(res) do
-            if f ~= '.' and f ~= '..' then
-                if not ext or f:sub(-#ext - 1) == '.' .. ext then
-                    filenames[#filenames + 1] = f
-                end
-            end
-        end
-    end
-    if #filenames == 0 then return '1 / 1' end
-    table.sort(filenames, natural_less)
-    for i = 1, #filenames do
-        if filenames[i] == file_name then
-            return string.format('%d / %d', i, #filenames)
-        end
-    end
-    return '1 / 1'
+
+--- 常见媒体扩展名（视频+音频），readdir 扫描时筛选“下一集”候选
+local MEDIA_EXTS = {}
+for _, ext in ipairs({
+    '3g2', '3gp', 'avi', 'flv', 'm2ts', 'm4v', 'mj2', 'mkv', 'mov',
+    'mp4', 'mpeg', 'mpg', 'ogv', 'rmvb', 'webm', 'wmv', 'y4m',
+    'aiff', 'ape', 'au', 'flac', 'm4a', 'mka', 'mp3', 'oga', 'ogg',
+    'ogm', 'opus', 'wav', 'wma',
+}) do
+    MEDIA_EXTS[ext] = true
 end
 
---- 从播放列表计算当前文件在同目录中的位置 "i / count"；
---- 参考同文件夹续播：读 playlist、收集同目录文件、自然排序定位。
---- 播放列表已包含 >=2 个同目录文件时按列表定位；否则（单文件加载、从历史/收藏菜单
---- 打开等）播放列表无法反映文件在目录中的真实位置，回退到目录扫描计算。
-local function position_in_folder(path)
-    if not path or path == '' then return '1 / 1' end
-    local dir_path = utils_mod.split_path(path)
-    local playlist = mp.get_property_native('playlist')
-    local same_dir = {}
-    if playlist then
-        for _, item in ipairs(playlist) do
-            if item and item.filename and item.filename ~= '' then
-                local item_dir = utils_mod.split_path(item.filename)
-                if same_path(item_dir, dir_path) then
-                    same_dir[#same_dir + 1] = item.filename
-                end
-            end
-        end
-    end
-    -- 播放列表含 >=2 个同目录文件：autoload 已把整个目录加载进列表，按列表定位即可
-    if #same_dir >= 2 then
-        table.sort(same_dir, natural_less)
-        for i = 1, #same_dir do
-            if same_path(same_dir[i], path) then
-                return string.format('%d / %d', i, #same_dir)
-            end
-        end
-    end
-    -- 播放列表信息不足：回退到目录扫描
-    return scan_folder_position(path)
+--- 是否为媒体文件（按扩展名判断，排除字幕、文本等干扰项）
+local function is_media_file(name)
+    local ext = name:match('%.([^%.\\/]+)$')
+    return ext ~= nil and MEDIA_EXTS[ext:lower()] ~= nil
 end
 
---- 从播放列表中查找记录条目所在目录的下一个视频路径；
---- 不依赖播放列表顺序：把同目录文件按文件名自然排序，取该记录之后的第一项。
---- 返回 next_path 与 found（true = 播放列表已就绪且可确认没有下一集）
+--- 用 readdir 扫描记录所在目录，把同目录媒体文件按文件名自然排序，
+--- 返回该记录之后的第一项路径；不依赖播放列表/autoload。
+--- 返回 next_path 与 found（true = 扫描成功且可确认没有下一集）
 function M._find_next_in_folder(entry)
     if not entry or not entry.path or entry.url then return nil, false end
-    local dir_path = utils_mod.split_path(entry.path)
-    local playlist = mp.get_property_native('playlist')
-    if not playlist then return nil, false end
-    local same_dir = {}
-    for _, item in ipairs(playlist) do
-        if item and item.filename and item.filename ~= '' then
-            local item_dir = utils_mod.split_path(item.filename)
-            if same_path(item_dir, dir_path) then
-                same_dir[#same_dir + 1] = item.filename
-            end
+    local dir_path, name = utils_mod.split_path(entry.path)
+    if dir_path == '' or dir_path == '.' then return nil, false end
+    local names, err = utils_mod.readdir(dir_path, 'files')
+    if not names then return nil, false end
+    local files = {}
+    for _, n in ipairs(names) do
+        if is_media_file(n) then files[#files + 1] = n end
+    end
+    if #files == 0 then return nil, false end
+    table.sort(files, natural_less)
+    for i = 1, #files do
+        if files[i]:lower() == name:lower() then
+            local nxt = files[i + 1]
+            if not nxt then return nil, true end -- 已是最后一个媒体文件：不提示
+            local nxt_path = dir_path .. nxt
+            if same_path(nxt_path, new_entry.path) then return nil, true end -- 下一集就是当前文件
+            return nxt_path, true
         end
     end
-    if #same_dir == 0 then return nil, false end
-    table.sort(same_dir, natural_less)
-    for i = 1, #same_dir do
-        if same_path(same_dir[i], entry.path) then
-            local nxt = same_dir[i + 1]
-            if not nxt then
-                -- 记录已是同目录最后一个文件：打开的就是该记录本身时，
-                -- 播放列表可能还没被 autoload 补全，继续轮询；否则确认是最后一集
-                if same_path(entry.path, new_entry.path) then return nil, false end
-                return nil, true
-            end
-            if same_path(nxt, new_entry.path) then return nil, true end -- 下一集就是当前文件
-            return nxt, true
-        end
-    end
-    -- 记录条目不在播放列表里：列表未就绪，继续轮询
+    -- 记录对应的文件已不在目录中（被移动/删除）：无法确认下一集，退回恢复提示
     return nil, false
 end
 
@@ -393,17 +307,13 @@ function M.set_auto_next(val)
     auto_next = val or false
 end
 
+--- 标记分组连播是否激活（抑制"同文件夹续播"提示）
+function M.set_group_playlist(val)
+    group_playlist = val or false
+end
+
 --- end-file 时调用：完成条目并插入历史
 function M.on_end_file()
-    if resume_poll and resume_poll.timer then
-        mp.cancel_timer(resume_poll.timer)
-    end
-    resume_poll = nil
-    -- 没有为下一个脚本加载预设标题时清理 force-media-title（避免残留污染非脚本加载的文件）；
-    -- 已为下一个脚本加载预置标题时不清理，防止误清新文件的标题
-    if not force_title_set then
-        mp.set_property('force-media-title', '')
-    end
     if not config.log then
         new_entry = {}
         return
@@ -425,10 +335,6 @@ function M.on_unload(hook)
     else
         new_entry.pos = 0
     end
-    -- 本地文件：从播放列表计算集内位置（供"按来源分组"扁平视图的 hint）
-    if new_entry.path and not new_entry.url then
-        new_entry.pos_in_folder = position_in_folder(new_entry.path)
-    end
 end
 
 --- 清空新条目（禁用记录时）
@@ -436,35 +342,33 @@ function M.clear_new_entry()
     new_entry = {}
 end
 
---- 加载文件辅助函数：有播放位置时传 start，否则不传（恢复交给 watch_later 或从头播放）
+--- 加载文件辅助函数：有播放位置时传 start，否则不传（恢复交给 watch_later 或从头播放）；
+--- 标题与外挂音轨用 %N% 定长编码直接放进 loadfile 每文件选项，随文件生命周期自动生效/失效，无需手动清理
 function M.load_file(params)
     from_record = true
-    -- loadfile 的选项参数是 key=value 字符串，值里含逗号/引号会破坏解析；
-    -- 因此只把纯数字的 start 放进选项串，标题与外挂音轨改为加载后设置属性，彻底免转义
+    group_playlist = false -- 新的脚本加载会重建播放上下文，清除分组连播抑制
     local opts = {}
     if params.pos ~= nil then
         opts[#opts + 1] = 'start=' .. params.pos
+    end
+    if params.media_title and params.media_title ~= '' then
+        opts[#opts + 1] = utils.loadfile_title_option(params.media_title)
+    end
+    if params.audio_path then
+        opts[#opts + 1] = 'audio-files=' .. utils.loadfile_value_option(params.audio_path)
     end
     local cmd = { 'loadfile', params.path, 'replace', -1 }
     if #opts > 0 then
         cmd[5] = table.concat(opts, ',')
     end
     mp.command_native(cmd)
-    -- 从脚本加载文件时统一强制设置标题（URL 与本地文件一致），保证菜单标题与记录标题一致；
-    -- force-media-title 是持久属性，须在 end-file 时清理，避免残留污染非脚本加载的文件
-    if params.media_title and params.media_title ~= '' then
-        mp.set_property('force-media-title', params.media_title)
-        force_title_set = true
-    end
-    if params.audio_path then
-        mp.set_property('audio-files', params.audio_path)
-    end
 end
 
-
---- 本次播放已开始：消费脚本预设的强制标题（无论是否启用记录都要消费）
-mp.register_event('file-loaded', function()
-    force_title_set = false
+-- 分组连播播放列表结束（进入 idle）时清除抑制标记
+mp.observe_property('idle-active', 'bool', function(name, val)
+    if val then group_playlist = false end
 end)
 
 return M
+
+

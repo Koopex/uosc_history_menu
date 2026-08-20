@@ -18,20 +18,25 @@ local defaults = {
     use_filename = false,
 
     -- 按来源分组视图：true = 扁平分组（本地文件每组只显示最新一条，
-    -- 标题用上层目录，hint 用集内位置；URL 始终按域名分组不受影响）
+    -- 标题用上层目录；URL 始终按域名分组不受影响）
     source_view_flat = false,
 
     -- 搜索结果按播放时间排序
     search_sorting = false,
 
-    -- 历史记录条目操作按钮（逗号分隔，按显示顺序；留空 = 不显示按钮，快捷键仍可用）
-    -- 可用值：mark（收藏）,copy（复制）,delete（删除）
-    history_actions = 'mark,delete',
+    -- 历史记录条目操作按钮（逗号分隔，按显示顺序；留空不显示按钮，但快捷键仍可用）
+    -- 可用值：mark（收藏）,delete（删除）,playlist（添加到播放列表）,copy（复制）
+    -- 分组语法：[delete,playlist] 会把组内操作折叠为一个“更多操作”按钮；空分组 [] 等效于自动补充未显示的操作
+    history_actions = 'mark,delete,[]',
 
     -- 收藏条目操作按钮（逗号分隔，按显示顺序；留空 = 不显示按钮，快捷键仍可用）
-    -- 可用值：new_group（新建分组）,rename（重命名）,move（移动）,copy（复制）,cut（剪切）,paste（粘贴）,delete（删除）
+    -- 可用值：new_group（新建分组）,rename（重命名）,move（移动）,copy（复制）,cut（剪切）,paste（粘贴）,delete（删除）,playlist（添加到播放列表）
     -- 分组语法：[move,copy,cut] 会把组内操作折叠为一个“更多操作”按钮；空分组 [] 等效于自动补充未显示的操作
     bookmark_actions = 'rename,delete,[]',
+
+    -- 从收藏菜单点击条目时，把所在收藏分组加入播放列表并连播
+    -- 可用值：no（关闭，默认）、siblings（只加入同级条目）、subtree（加入整棵子树的条目）
+    bookmark_play_group = 'no',
 
     -- 收藏夹每层顶部显示"新建分组"按钮
     bookmark_new_group_button = false,
@@ -49,7 +54,7 @@ local defaults = {
 local M = {}
 
 -- 所有可用的操作按钮名称（未知名称在解析时被过滤）
-local known_actions = { mark = true, delete = true, rename = true, copy = true, cut = true, paste = true, move = true, new_group = true }
+local known_actions = { mark = true, delete = true, rename = true, copy = true, cut = true, paste = true, move = true, new_group = true, playlist = true }
 
 --- 解析逗号分隔的操作按钮列表：支持分组语法 [a,b,c]（组内操作折叠为“更多操作”按钮；空分组 [] 等效于 more）
 --- 返回 token 数组：字符串 = 单按钮；table = 分组（空表表示自动补充未显示的操作）

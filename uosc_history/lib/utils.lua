@@ -79,10 +79,55 @@ function M.title_from_path(path)
     return name
 end
 
+
+--- 把字符串编码为 loadfile 每文件选项的值：%N% 定长格式，值里的逗号/引号/空格都不会破坏选项解析
+function M.loadfile_value_option(value)
+    if not value or value == '' then return nil end
+    return '%' .. #value .. '%' .. value
+end
+
+--- 构造 force-media-title 选项（标题为空时返回 nil）
+function M.loadfile_title_option(title)
+    local v = M.loadfile_value_option(title)
+    if not v then return nil end
+    return 'force-media-title=' .. v
+end
 --- 构造按钮悬停说明：第一行按钮说明，第二行直接显示完整路径（不折行、不截断）
 function M.footnote_label(label, path)
     if not path or path == '' then return label end
     return label .. '\n' .. path
 end
 
+--- 菜单操作快捷键表：统一维护，展示时直接引用，避免散落硬编码
+M.KEYS = {
+    filter = '←/→',                          -- 切换过滤方式
+    search = 'Ctrl+f',                       -- 搜索记录
+    rename = 'F2',                           -- 重命名
+    copy = 'Ctrl+c',                         -- 复制
+    cut = 'Ctrl+x',                          -- 剪切
+    paste = 'Ctrl+v',                        -- 粘贴
+    move = 'Ctrl+m',                         -- 移动
+    new_group = 'Ctrl+n',                    -- 新建分组
+    add_to_playlist = 'Ctrl+p',              -- 添加到播放列表
+    delete = 'Del',                          -- 删除
+    bookmark = 'Ctrl+d',                     -- 收藏
+    reorder = 'Ctrl+Home/End/PgUp/PgDw/↑/↓', -- 排序
+}
+
+--- 生成"操作 (快捷键)"格式的按键提示；无快捷键的操作只显示名称
+--- list: {label=操作名, key=快捷键} 数组
+function M.key_footnote(list)
+    local parts = {}
+    for _, item in ipairs(list or {}) do
+        if item.key then
+            parts[#parts + 1] = item.label .. ' (' .. item.key .. ')'
+        else
+            parts[#parts + 1] = item.label
+        end
+    end
+    return table.concat(parts, '   ')
+end
+
 return M
+
+

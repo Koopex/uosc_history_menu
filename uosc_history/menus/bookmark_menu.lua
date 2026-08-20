@@ -1,5 +1,5 @@
 -- 收藏菜单：打开/更新/分组选择 + 事件路由
--- 操作：F2 重命名、Ctrl+c 复制、Ctrl+x 剪切、Ctrl+v 粘贴、Ctrl+n 新建分组、Del 删除、Ctrl+Home/End/PgUp/PgDw/↑/↓ 排序
+-- 操作：重命名、复制、剪切、粘贴、新建分组、添加到播放列表、删除、排序
 
 local M = {}
 
@@ -114,15 +114,36 @@ local function clear_clip_state()
     clip_state = nil
 end
 
+--- 收藏菜单底部按键提示：操作 (快捷键)，键名统一取 KEYS 表
+local function bookmark_footnote()
+    if not (our_utils and our_utils.KEYS and our_utils.key_footnote) then return '' end
+    local operations = our_utils.key_footnote({
+        { label = I18N.rename, key = our_utils.KEYS.rename },
+        { label = I18N.delete, key = our_utils.KEYS.delete },
+        { label = I18N.create_folder_below, key = our_utils.KEYS.new_group },
+        { label = I18N.copy, key = our_utils.KEYS.copy },
+        { label = I18N.cut, key = our_utils.KEYS.cut },
+        { label = I18N.paste, key = our_utils.KEYS.paste },
+        { label = I18N.move, key = our_utils.KEYS.move },
+    })
+    local extras = our_utils.key_footnote({
+        { label = I18N.add_to_playlist, key = our_utils.KEYS.add_to_playlist },
+        { label = I18N.reorder, key = our_utils.KEYS.reorder },
+    })
+    return operations .. '\n' .. extras
+end
+
 function M.open(update, submenu_id)
+    local footnote = bookmark_footnote()
     local items = bookmarks.get_menu_items(
         { script_name, 'bookmark_menu_event' },
         {
             rename = I18N.rename, copy = I18N.copy, cut = I18N.cut, paste = I18N.paste, move = I18N.move, delete = I18N.delete,
             new_group = I18N.create_folder_below,
+            add_to_playlist = I18N.add_to_playlist,
             more = I18N.more_actions,
             unknown = I18N.unknown,
-            bookmark_footnote = I18N.bookmark_footnote,
+            bookmark_footnote = footnote,
             actions = config.bookmark_actions,
         })
     items = M._enrich_items(items)
@@ -134,9 +155,9 @@ function M.open(update, submenu_id)
     end
     local props = {
         type = 'bookmarks', id = 'bookmarks', title = I18N.title_bookmarks, items = items,
-        on_move = 'callback', on_paste = 'callback', bind_keys = { 'f2', 'ctrl+x', 'ctrl+n' },
+        on_move = 'callback', on_paste = 'callback', bind_keys = { 'f2', 'ctrl+x', 'ctrl+n', 'ctrl+p', 'ctrl+m' },
         callback = { script_name, 'bookmark_menu_event' },
-        footnote = I18N.bookmark_footnote,
+        footnote = footnote,
     }
     if update then
         if submenu_id then
@@ -160,15 +181,16 @@ function M.toggle()
 end
 
 --- 递归构建收藏位置浏览器菜单树：只列出分组节点，每级顶部为"新建分组/添加到此处"
---- 顶部操作按钮统一样式：收藏菜单"新建分组"按钮与收藏位置浏览器的两个按钮共用
-local function top_button(title, value, icon)
-    return { title = title, value = value, align = 'center', bold = true, icon = icon }
+--- 顶部操作按钮统一样式：收藏菜单"新建分组"按钮与收藏位置浏览器的两个按钮共用；
+--- 普通样式（不加粗、不居中），最后一个操作条目带 separator 分隔线
+local function top_button(title, value, icon, separator)
+    return { title = title, value = value, icon = icon, separator = separator or nil }
 end
 
 local function picker_items(container, path_prefix, msg, filter_query, filter_path)
     local items = {
         top_button(msg.create, { pick_new_folder = true }, 'create_new_folder'),
-        top_button(msg.add_here, { pick_add_here = true }, 'add'),
+        top_button(msg.add_here, { pick_add_here = true }, 'add', true),
     }
     local is_filter_level = filter_path and #filter_path == #path_prefix
         and table.concat(filter_path, '.') == table.concat(path_prefix, '.')
@@ -182,7 +204,7 @@ local function picker_items(container, path_prefix, msg, filter_query, filter_pa
             if matched then
                 table.insert(items, {
                     id = pick_id(node_path),
-                    title = node.title or I18N.unknown,
+                    title = '📁  ' .. (node.title or I18N.unknown),
                     items = picker_items(node.items, node_path, msg, filter_query, filter_path),
                 })
             end
@@ -419,6 +441,44 @@ function M._load_values(value)
     return { path = value, pos = nil }
 end
 
+--- 把所在收藏分组加入播放列表并连播：点击条目按原逻辑加载（带 start），
+--- 其余条目从头播（start=0 覆盖 watch_later），播放列表保持菜单顺序
+function M._play_group(container, index, load_values)
+    local flat = bookmarks.flatten_around(container, index, config.bookmark_play_group)
+    local leaves, clicked_pos = flat.leaves, flat.clicked
+    if clicked_pos == 0 or #leaves == 0 then
+        if M.global_actions then M.global_actions.load_file(load_values) end
+        return
+    end
+    -- 点击条目 replace 加载；其余条目追加（从头播）
+    if M.global_actions then M.global_actions.load_file(load_values) end
+    local after, before = {}, {}
+    for i = 1, #leaves do
+        if i < clicked_pos then before[#before + 1] = leaves[i]
+        elseif i > clicked_pos then after[#after + 1] = leaves[i] end
+    end
+    local function append_group_entry(node)
+        local opts = { 'start=0' }
+        local opt = our_utils and our_utils.loadfile_title_option(node.title)
+        if opt then opts[#opts + 1] = opt end
+        mp.commandv('loadfile', node.path, 'append-play', -1, table.concat(opts, ','))
+    end
+    for _, node in ipairs(after) do
+        append_group_entry(node)
+    end
+    -- before 按逆序追加到队尾，再逐个移到队首恢复菜单顺序（playlist-move 索引从 0 开始）
+    for i = #before, 1, -1 do
+        append_group_entry(before[i])
+    end
+    for i = 1, #before do
+        mp.commandv('playlist-move', tostring(#leaves - 1), tostring(i - 1))
+    end
+    -- 分组连播期间抑制"同文件夹续播"提示；load_file 内部会清除该标记，须在加载后设置
+    if #leaves > 1 and M.global_actions and M.global_actions.set_group_playlist then
+        M.global_actions.set_group_playlist(true)
+    end
+end
+
 --- 统一粘贴逻辑：脚本内剪贴板状态命中则移动/复制，否则按导入处理
 local function do_paste(container, index, text)
     if not text or text == '' then
@@ -460,6 +520,8 @@ function M.handlers.activate(event)
         M._copy_or_cut(id_to_path(event.menu_id), event_index(event), 'cut')
     elseif a == 'move' then
         M._start_move(id_to_path(event.menu_id), event_index(event))
+    elseif a == 'playlist' then
+        M._add_to_playlist(id_to_path(event.menu_id), event_index(event))
     elseif a == 'paste' then
         -- 按钮点击不带剪贴板文本，主动读取后走统一粘贴逻辑
         do_paste(id_to_path(event.menu_id), event_index(event), clipboard and clipboard.get() or '')
@@ -474,7 +536,15 @@ function M.handlers.activate(event)
         M._open_more_menu(id_to_path(event.menu_id), event_index(event), ops)
     elseif not a then
         if not event.value then return end
-        if M.global_actions then M.global_actions.load_file(M._load_values(event.value)) end
+        local load_values = M._load_values(event.value)
+        if M.global_actions then
+            local mode = config.bookmark_play_group or 'no'
+            if mode == 'siblings' or mode == 'subtree' then
+                M._play_group(id_to_path(event.menu_id), event_index(event), load_values)
+            else
+                M.global_actions.load_file(load_values)
+            end
+        end
         mp.commandv('script-message-to', 'uosc', 'close-menu')
     end
 end
@@ -496,6 +566,10 @@ function M.handlers.key(event)
         M._copy_or_cut(container, idx, 'cut')
     elseif event.id == 'ctrl+n' then
         M._show_new_group_dialog(container, idx)
+    elseif event.id == 'ctrl+p' then
+        M._add_to_playlist(container, idx)
+    elseif event.id == 'ctrl+m' then
+        M._start_move(container, idx)
     end
 end
 
@@ -559,6 +633,7 @@ function M.handlers.paste(event)
 end
 
 --- "更多操作"菜单的操作定义（完整列表，与收藏条目可用按钮一致）
+--- 该菜单不显示快捷键，只展示操作名称
 local function more_op_defs()
     return {
         rename    = { icon = 'edit', label = I18N.rename },
@@ -568,21 +643,23 @@ local function more_op_defs()
         move      = { icon = 'drive_file_move', label = I18N.move },
         delete    = { icon = 'delete', label = I18N.delete },
         new_group = { icon = 'create_new_folder', label = I18N.create_folder_below },
+        playlist  = { icon = 'playlist_add', label = I18N.add_to_playlist },
     }
 end
 
---- 打开“更多操作”菜单：ops 为分组指定的操作；nil 时自动补充未显示的操作。最后一项“返回”
+--- 打开“更多操作”菜单：ops 为分组指定的操作；nil 时自动补充未显示的操作。第一项“返回”
 function M._open_more_menu(container, index, ops)
     pending.more_context = { container = container or {}, index = index }
     local defs = more_op_defs()
-    local items = {}
+    local items = {
+        { title = I18N.back, icon = 'arrow_back', value = { more_back = true }, separator = true },
+    }
     for _, name in ipairs(ops or M._auto_more_ops()) do
         local def = defs[name]
         if def then
             items[#items + 1] = { title = def.label, icon = def.icon, value = { more_op = name } }
         end
     end
-    items[#items + 1] = { title = I18N.back, icon = 'arrow_back', value = { more_back = true } }
     mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({
         type = 'bookmark_more',
         id = 'bookmark_more',
@@ -604,7 +681,7 @@ function M._auto_more_ops()
         end
     end
     local ops = {}
-    for _, name in ipairs({ 'rename', 'copy', 'cut', 'paste', 'move', 'delete', 'new_group' }) do
+    for _, name in ipairs({ 'rename', 'delete', 'new_group', 'playlist', 'copy', 'cut', 'paste', 'move' }) do
         if not shown[name] then ops[#ops + 1] = name end
     end
     return ops
@@ -651,6 +728,42 @@ function M._handle_more_activate(event)
         M._start_move(container, index)
     elseif v.more_op == 'new_group' then
         M._show_new_group_dialog(container, index)
+    elseif v.more_op == 'playlist' then
+        M._add_to_playlist(container, index)
+        M._return_from_more()
+    end
+end
+
+--- 把收藏条目加入当前播放列表：叶子条目直接添加；
+--- 分组条目按 bookmark_play_group 决定范围（subtree 递归整棵子树，否则只加第一层叶子）；
+--- 追加时把条目标题作为每文件选项（force-media-title）传入，播放列表条目标题可读
+function M._add_to_playlist(container, index)
+    local node = bookmarks.get_at(container, index)
+    if not node then return end
+    local nodes
+    if node.items ~= nil then
+        local group_path = {}
+        for _, p in ipairs(container or {}) do table.insert(group_path, p) end
+        table.insert(group_path, index)
+        nodes = bookmarks.collect_leaves(group_path, config.bookmark_play_group or 'no')
+    else
+        nodes = { node }
+    end
+    local count = 0
+    for _, n in ipairs(nodes) do
+        if n.path and n.path ~= '' then
+            -- 一律只追加到播放列表，不自动加载、不改变播放状态
+            local title = (n.title and n.title ~= '') and n.title
+                          or (our_utils and our_utils.title_from_path(n.path))
+            local cmd = { 'loadfile', n.path, 'append', -1 }
+            local opt = our_utils and our_utils.loadfile_title_option(title)
+            if opt then cmd[5] = opt end
+            mp.command_native(cmd)
+            count = count + 1
+        end
+    end
+    if count > 0 then
+        mp.osd_message(I18N.playlist_append:format(count), 2.5)
     end
 end
 --- 复制或剪切选中节点到剪贴板
@@ -987,7 +1100,7 @@ function M._import(container, index, text)
 end
 
 --- 显示重命名输入框（预填当前标题）
---- 打开新建分组输入框；index 有值则插入到选中项之后（Ctrl+n），否则追加到末尾（顶部按钮）
+--- 打开新建分组输入框；index 有值则插入到选中项之后（快捷键见 KEYS 表），否则追加到末尾（顶部按钮）
 function M._show_new_group_dialog(container, index)
     pending.new_group_container = container
     pending.new_group_index = index
@@ -998,7 +1111,7 @@ end
 --- 配置开启时：在每一层顶部注入"新建分组"按钮（纯 UI 项，不进入数据层；value 携带所在层的数据路径）
 function M._inject_new_group_buttons(list, container)
     local result = {
-        top_button(I18N.create_bookmark_folder, { new_group = true, path = container }, 'create_new_folder'),
+        top_button(I18N.create_bookmark_folder, { new_group = true, path = container }, 'create_new_folder', true),
     }
     for i, node in ipairs(list) do
         if node.items then
@@ -1076,3 +1189,5 @@ function M.handle_event(json)
 end
 
 return M
+
+

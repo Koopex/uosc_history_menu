@@ -132,6 +132,10 @@ function actions.load_file(params)
     tracker.load_file(params)
 end
 
+function actions.set_group_playlist(val)
+    tracker.set_group_playlist(val)
+end
+
 function actions.add_bookmark(bm)
     if config.quick_mark then
         bookmark_menu.start_add_bookmark(bm.title, bm.path, true)
@@ -270,7 +274,12 @@ local function add_playlist()
         if entry and entry.filename and entry.filename ~= '' then
             local title = entry.title
             if not title or title == '' then
-                title = utils.title_from_path(entry.filename)
+                -- URL 条目直接用完整链接作为标题；本地文件取文件名
+                if utils.is_url(entry.filename) then
+                    title = entry.filename
+                else
+                    title = utils.title_from_path(entry.filename)
+                end
             end
             table.insert(items, { title = title, path = entry.filename })
         end

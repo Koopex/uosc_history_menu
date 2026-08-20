@@ -32,24 +32,60 @@ end
 -- 菜单打开/更新 ------------------------------------------------------------
 -----------------------------------------------------------------------------
 
+--- 历史菜单底部按键提示：操作 (快捷键)，键名统一取 KEYS 表
+local function history_footnote()
+    if not (our_utils and our_utils.KEYS and our_utils.key_footnote) then return '' end
+    return our_utils.key_footnote({
+        { label = I18N.switch_filter, key = our_utils.KEYS.filter },
+        { label = I18N.search, key = our_utils.KEYS.search },
+        { label = I18N.bookmark_add, key = our_utils.KEYS.bookmark },
+        { label = I18N.copy, key = our_utils.KEYS.copy },
+        { label = I18N.add_to_playlist, key = our_utils.KEYS.add_to_playlist },
+        { label = I18N.del, key = our_utils.KEYS.delete },
+    })
+end
+
 --- 根据配置的操作按钮列表构建 uosc 按钮（顺序即显示顺序）
+--- 支持分组语法：[a,b,c] 折叠为一个"更多操作"按钮；空分组 [] 等效于自动补充未显示的操作
 --- label 附加条目路径：悬停按钮时 uosc 在底部 footnote 显示"按钮名 + 换行 + 完整路径"
---- 按钮定义在调用时构造，避免模块加载期引用尚未注入的 I18N
 local function build_actions(list, path)
     local defs = {
-        mark   = { icon = 'star', label = I18N.bookmark_add },
-        copy   = { icon = 'content_copy', label = I18N.copy },
-        delete = { icon = 'delete', label = I18N.del },
+        mark     = { icon = 'star', label = I18N.bookmark_add, key = our_utils and our_utils.KEYS and our_utils.KEYS.bookmark },
+        copy     = { icon = 'content_copy', label = I18N.copy, key = our_utils and our_utils.KEYS and our_utils.KEYS.copy },
+        delete   = { icon = 'delete', label = I18N.del, key = our_utils and our_utils.KEYS and our_utils.KEYS.delete },
+        playlist = { icon = 'playlist_add', label = I18N.add_to_playlist, key = our_utils and our_utils.KEYS and our_utils.KEYS.add_to_playlist },
+        more     = { icon = 'more_horiz', label = I18N.more_actions },
     }
+    local function more_button(name)
+        local label = our_utils and our_utils.footnote_label(defs.more.label, path) or defs.more.label
+        return { name = name, icon = defs.more.icon, label = label }
+    end
+    -- 统计已配置的操作数（直接按钮 + 分组内），[] 在全部操作都已配置时不显示
+    local configured = {}
+    for _, token in ipairs(list or {}) do
+        if type(token) == 'table' then
+            for _, n in ipairs(token) do configured[n] = true end
+        elseif defs[token] then
+            configured[token] = true
+        end
+    end
+    local op_count = 0
+    for _ in pairs(configured) do op_count = op_count + 1 end
     local actions = {}
-    for _, name in ipairs(list or {}) do
-        local def = defs[name]
-        if def then
-            actions[#actions + 1] = {
-                name = name,
-                icon = def.icon,
-                label = our_utils and our_utils.footnote_label(def.label, path) or def.label,
-            }
+    for _, token in ipairs(list or {}) do
+        if type(token) == 'table' then
+            if #token > 0 then
+                actions[#actions + 1] = more_button('more:' .. table.concat(token, ','))
+            elseif op_count < 4 then
+                -- 空分组 []：等效于 more，自动补充未显示的操作
+                actions[#actions + 1] = more_button('more')
+            end
+        elseif defs[token] then
+            local def = defs[token]
+            -- "操作 (快捷键)" 格式；无快捷键的操作只显示名称
+            local label = def.key and (def.label .. ' (' .. def.key .. ')') or def.label
+            label = our_utils and our_utils.footnote_label(label, path) or label
+            actions[#actions + 1] = { name = token, icon = def.icon, label = label }
         end
     end
     return actions
@@ -61,7 +97,7 @@ local function attach_item_actions(list)
     for _, it in ipairs(list) do
         if it.items then
             it.callback = { script_name, 'history_menu_event' }
-            it.footnote = I18N.footnote
+            it.footnote = history_footnote()
             attach_item_actions(it.items)
         elseif it.value and it.value.path then
             it.actions = build_actions(config.history_actions, it.value.path)
@@ -95,7 +131,7 @@ local function build_props(filter, select_index)
         selected_index = select_index or 1,
         items = items,
         item_actions = item_actions,
-        footnote = I18N.footnote,
+        footnote = history_footnote(),
         callback = { script_name, 'history_menu_event' },
     }
 
@@ -103,8 +139,8 @@ local function build_props(filter, select_index)
         menu_props.on_search = 'callback'
         menu_props.search_debounce = 'submit'
     end
-    -- 允许用 ctrl+d 收藏当前选中的条目/分组（来源分组视图的文件夹节点没有操作按钮，需要按键触发）
-    menu_props.bind_keys = { 'ctrl+d' }
+    -- 允许用 ctrl+d 收藏、ctrl+p 添加到播放列表（来源分组视图的文件夹节点没有操作按钮，需要按键触发）
+    menu_props.bind_keys = { 'ctrl+d', 'ctrl+p' }
 
     return menu_props
 end
@@ -154,6 +190,7 @@ local function build_search_props(results, select_index, filter)
         on_search = 'callback',
         search_debounce = 'submit',
         callback = { script_name, 'history_menu_event' },
+        bind_keys = { 'ctrl+d', 'ctrl+p' },
     }
 end
 
@@ -189,6 +226,7 @@ local pending = {
     search_results = nil,
     search_query = nil,
     mark_menu_id = nil,
+    more_context = nil,
 }
 
 function M.set_mark_return(source, filter, index, search_results, menu_id)
@@ -204,12 +242,25 @@ M.handlers = {}
 
 function M.handlers.activate(event)
     local action = event.action
+    if event.menu_id == 'history_more' then
+        M._handle_more_activate(event)
+        return
+    end
     if action == 'delete' then
         M._handle_delete(event)
     elseif action == 'mark' then
         M._handle_mark(event)
     elseif action == 'copy' then
         M._handle_copy(event)
+    elseif action == 'playlist' then
+        M._handle_playlist(event)
+    elseif action == 'more' or (type(action) == 'string' and action:sub(1, 5) == 'more:') then
+        local ops
+        if type(action) == 'string' and action:sub(1, 5) == 'more:' then
+            ops = {}
+            for op in action:sub(6):gmatch('[^,]+') do ops[#ops + 1] = op end
+        end
+        M._open_more_menu(event, ops)
     else
         local value = event.value
         if not value then return end
@@ -220,6 +271,7 @@ function M.handlers.activate(event)
 end
 
 function M.handlers.key(event)
+    if event.menu_id == 'history_more' then return end
     local key = event.id
     if key == 'del' then
         M._handle_delete(event)
@@ -242,10 +294,13 @@ function M.handlers.key(event)
         M._handle_copy(event)
     elseif key == 'ctrl+d' then
         M._handle_mark(event)
+    elseif key == 'ctrl+p' then
+        M._handle_playlist(event)
     end
 end
 
 function M.handlers.search(event)
+    if event.menu_id == 'history_more' then return end
     -- 来源分组视图为嵌套结构，搜索时改用去重表条目（叶子与分组视图一致）
     local filter = history.get_filter()
     local items = (filter == 'by_folder') and history.get_view('recent') or history.get_view()
@@ -326,6 +381,15 @@ local function collect_node_peers(node, out)
     end
 end
 
+--- 递归收集分组节点下所有叶子节点
+local function collect_node_leaves(node, out)
+    if node.items then
+        for _, child in ipairs(node.items) do collect_node_leaves(child, out) end
+    elseif node.value and node.value.path then
+        out[#out + 1] = node
+    end
+end
+
 --- 在视图树中按 id 查找节点（来源分组视图的子菜单 id 即节点 id）
 local function find_node_by_id(list, menu_id)
     for _, node in ipairs(list) do
@@ -393,8 +457,153 @@ function M._handle_copy(event)
     mp.osd_message(I18N.copied)
 end
 
---- 删除搜索结果后刷新：用新数据重跑关键词过滤，原地 update-menu 刷新结果菜单
-function M._refresh_search(keep_index)
+--- 把历史条目/分组加入播放列表：叶子或扁平分组用 peers 指向的原始条目，嵌套分组收集所有叶子；
+--- 追加时把条目标题作为每文件选项（force-media-title）传入，播放列表条目标题可读
+function M._handle_playlist(event)
+    local node = M._resolve_event_node(event)
+    if not node then return end
+    local count = 0
+    local seen = {}
+    local function add_path(p, media_title)
+        if p and p ~= '' and not seen[p] then
+            seen[p] = true
+            local title = (media_title and media_title ~= '') and media_title
+                          or (our_utils and our_utils.title_from_path(p))
+            local cmd = { 'loadfile', p, 'append', -1 }
+            local opt = our_utils and our_utils.loadfile_title_option(title)
+            if opt then cmd[5] = opt end
+            mp.command_native(cmd)
+            count = count + 1
+        end
+    end
+    if node.items then
+        local leaves = {}
+        collect_node_leaves(node, leaves)
+        for _, n in ipairs(leaves) do
+            add_path(n.value and n.value.path, n.value and n.value.media_title)
+        end
+    elseif node.value and node.value.peers then
+        local entries = history.get_entries()
+        for _, p in ipairs(node.value.peers) do
+            local e = entries[p]
+            add_path(e and e.path, e and e.media_title)
+        end
+    else
+        return
+    end
+    if count > 0 then
+        mp.osd_message(I18N.playlist_append:format(count), 2.5)
+    end
+end
+
+-----------------------------------------------------------------------------
+-- "更多操作"菜单 -------------------------------------------------------------
+-----------------------------------------------------------------------------
+
+--- "更多操作"菜单的操作定义（历史菜单可用操作；该菜单不显示快捷键）
+local function more_op_defs()
+    return {
+        mark     = { icon = 'star', label = I18N.bookmark_add },
+        delete   = { icon = 'delete', label = I18N.del },
+        playlist = { icon = 'playlist_add', label = I18N.add_to_playlist },
+        copy     = { icon = 'content_copy', label = I18N.copy },
+    }
+end
+
+--- 打开"更多操作"菜单：ops 为分组指定的操作；nil 时自动补充未显示的操作。第一项"返回"
+function M._open_more_menu(event, ops)
+    local index = event.index or (event.selected_item and event.selected_item.index)
+    pending.more_context = {
+        filter = history.get_filter(),
+        menu_id = event.menu_id,
+        index = index,
+        is_search = event.menu_id == 'search_menu',
+        value = event.value or (event.selected_item and event.selected_item.value),
+    }
+    local defs = more_op_defs()
+    local items = {
+        { title = I18N.back, icon = 'arrow_back', value = { more_back = true }, separator = true },
+    }
+    for _, name in ipairs(ops or M._auto_more_ops()) do
+        local def = defs[name]
+        if def then
+            items[#items + 1] = { title = def.label, icon = def.icon, value = { more_op = name } }
+        end
+    end
+    mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({
+        type = 'history_more',
+        id = 'history_more',
+        title = I18N.more_actions,
+        items = items,
+        search_style = 'disabled',
+        callback = { script_name, 'history_menu_event' },
+    }))
+end
+
+--- 空分组 [] 的自动补充顺序：mark → delete → playlist → copy
+function M._auto_more_ops()
+    local shown = {}
+    for _, token in ipairs(config.history_actions or {}) do
+        if type(token) == 'table' then
+            for _, n in ipairs(token) do shown[n] = true end
+        else
+            shown[token] = true
+        end
+    end
+    local ops = {}
+    for _, name in ipairs({ 'mark', 'delete', 'playlist', 'copy' }) do
+        if not shown[name] then ops[#ops + 1] = name end
+    end
+    return ops
+end
+
+--- 从"更多操作"菜单返回历史菜单并选中原条目
+function M._return_from_more()
+    local ctx = pending.more_context
+    pending.more_context = nil
+    if not ctx then return end
+    if ctx.is_search then
+        M.open_search(pending.search_results, ctx.index)
+    else
+        local submenu_id = M._is_source_submenu(ctx.menu_id) and ctx.menu_id or nil
+        M.open(ctx.filter, ctx.index, submenu_id)
+    end
+end
+
+--- "更多操作"菜单条目点击：构造指向原条目的合成事件，复用现有处理逻辑
+function M._handle_more_activate(event)
+    local v = event.value
+    if not v then return end
+    if v.more_back then
+        M._return_from_more()
+        return
+    end
+    local ctx = pending.more_context
+    if not (v.more_op and ctx) then return end
+    local target = {
+        type = 'activate',
+        menu_id = ctx.menu_id,
+        index = ctx.index,
+        value = ctx.value,
+        selected_item = { index = ctx.index, value = ctx.value },
+    }
+    if v.more_op == 'mark' then
+        pending.more_context = nil
+        M._handle_mark(target)
+    elseif v.more_op == 'delete' then
+        pending.more_context = nil
+        M._handle_delete(target, true)
+    elseif v.more_op == 'playlist' then
+        M._handle_playlist(target)
+        M._return_from_more()
+    elseif v.more_op == 'copy' then
+        M._handle_copy(target)
+        M._return_from_more()
+    end
+end
+
+--- 删除搜索结果后刷新：用新数据重跑关键词过滤，原地 update-menu 刷新结果菜单；reopen=true 时改用 open-menu 重开
+function M._refresh_search(keep_index, reopen)
     if not pending.search_query then return end
     local filter = history.get_filter()
     local items = (filter == 'by_folder') and history.get_view('recent') or history.get_view()
@@ -405,11 +614,16 @@ function M._refresh_search(keep_index)
     end
     pending.search_results = results
     local select_index = keep_index and math.min(keep_index, #results) or 1
-    mp.commandv('script-message-to', 'uosc', 'update-menu',
-        utils.format_json(build_search_props(results, select_index, filter)))
+    if reopen then
+        M.open_search(results, select_index, filter)
+    else
+        mp.commandv('script-message-to', 'uosc', 'update-menu',
+            utils.format_json(build_search_props(results, select_index, filter)))
+    end
 end
 
-function M._handle_delete(event)
+--- 删除条目/分组；reopen=true 用于"更多操作"菜单（该菜单覆盖在历史菜单之上，需 open-menu 重开）
+function M._handle_delete(event, reopen)
     local index = event.selected_item and event.selected_item.index or event.index
     local filter = history.get_filter()
     local node = M._resolve_event_node(event)
@@ -426,12 +640,16 @@ function M._handle_delete(event)
     end
     history.invalidate_cache()
     if event.menu_id == 'search_menu' then
-        -- 自定义搜索：用新数据重跑过滤，原地刷新结果菜单
-        M._refresh_search(index)
+        -- 自定义搜索：用新数据重跑过滤刷新结果菜单
+        M._refresh_search(index, reopen)
     else
         -- 原生搜索/普通视图：uosc update 后保留搜索词并自动重过滤
         local submenu_id = M._is_source_submenu(event.menu_id) and event.menu_id or nil
-        M.update(filter, index, submenu_id)
+        if reopen then
+            M.open(filter, index, submenu_id)
+        else
+            M.update(filter, index, submenu_id)
+        end
     end
 end
 
@@ -479,7 +697,7 @@ function M.return_after_mark()
 end
 
 function M.clear_pending()
-    pending = { mark_source = nil, mark_filter = nil, mark_index = nil, search_results = nil, mark_menu_id = nil }
+    pending = { mark_source = nil, mark_filter = nil, mark_index = nil, search_results = nil, mark_menu_id = nil, more_context = nil }
 end
 
 -----------------------------------------------------------------------------
@@ -494,3 +712,4 @@ function M.handle_event(json)
 end
 
 return M
+

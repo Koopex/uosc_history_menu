@@ -83,6 +83,10 @@ function M.load(data_path)
             normalize_entry(entry)
         end
     end
+    -- 移除历史遗留的 pos_in_folder（字段已取消，避免旧数据一直回写）
+    for _, entry in ipairs(entries) do
+        if type(entry) == 'table' then entry.pos_in_folder = nil end
+    end
 
     -- 收藏条目：v3 及更早使用 value 键，v4 起统一为 path（迁移幂等，总是执行）
     local bookmark_entries = data.bookmark_entries or {}

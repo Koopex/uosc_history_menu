@@ -127,7 +127,7 @@ end
 
 --- 从去重表构建“按来源分组”扁平视图（source_view_flat=true）：
 --- 本地文件按上层目录分组，每组只显示该组最新的一条记录，标题用上层目录
---- （Season xx 时显示为 "系列 / Season xx"），hint 用数据文件里的集内位置 pos_in_folder；
+--- （Season xx 时显示为 "系列 / Season xx"），不显示 hint；
 --- 删除用 peers 删除整组，收藏/复制用最新记录。URL 始终按域名/IP 构建子菜单，不受此选项影响。
 local function build_flat_source_view(dedup_items)
     local roots = {}
@@ -164,7 +164,6 @@ local function build_flat_source_view(dedup_items)
                     root = {
                         id = 'by_folder.' .. key,
                         title = '📁  ' .. (group_title or ''),
-                        hint = value.pos_in_folder or '',
                         value = gvalue,
                     }
                     table.insert(roots, root)
@@ -265,7 +264,6 @@ local function compute_views()
                 url = entry.url,
                 audio_path = entry.audio_path,
                 media_title = entry.media_title,
-                pos_in_folder = entry.pos_in_folder,
             }
             -- 每个视图叶子都带原始条目索引（peers），搜索/过滤后仍能正确定位
             base_value.peers = { i }
