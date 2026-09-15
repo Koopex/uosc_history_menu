@@ -500,13 +500,14 @@ end
 -- "更多操作"菜单 -------------------------------------------------------------
 -----------------------------------------------------------------------------
 
---- "更多操作"菜单的操作定义（历史菜单可用操作；该菜单不显示快捷键）
+--- "更多操作"菜单的操作定义（历史菜单可用操作；每项带 key 字段，构建条目时写入 hint）
 local function more_op_defs()
+    local KEYS = our_utils and our_utils.KEYS or {}
     return {
-        mark     = { icon = 'star', label = I18N.bookmark_add },
-        delete   = { icon = 'delete', label = I18N.del },
-        playlist = { icon = 'playlist_add', label = I18N.add_to_playlist },
-        copy     = { icon = 'content_copy', label = I18N.copy },
+        mark     = { icon = 'star', label = I18N.bookmark_add, key = KEYS.bookmark },
+        delete   = { icon = 'delete', label = I18N.del, key = KEYS.delete },
+        playlist = { icon = 'playlist_add', label = I18N.add_to_playlist, key = KEYS.add_to_playlist },
+        copy     = { icon = 'content_copy', label = I18N.copy, key = KEYS.copy },
     }
 end
 
@@ -527,7 +528,7 @@ function M._open_more_menu(event, ops)
     for _, name in ipairs(ops or M._auto_more_ops()) do
         local def = defs[name]
         if def then
-            items[#items + 1] = { title = def.label, icon = def.icon, value = { more_op = name } }
+            items[#items + 1] = { title = def.label, icon = def.icon, hint = def.key, value = { more_op = name } }
         end
     end
     mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({

@@ -633,17 +633,18 @@ function M.handlers.paste(event)
 end
 
 --- "更多操作"菜单的操作定义（完整列表，与收藏条目可用按钮一致）
---- 该菜单不显示快捷键，只展示操作名称
+--- 每项带 key 字段，构建条目时写入 hint 展示快捷键
 local function more_op_defs()
+    local KEYS = our_utils and our_utils.KEYS or {}
     return {
-        rename    = { icon = 'edit', label = I18N.rename },
-        copy      = { icon = 'content_copy', label = I18N.copy },
-        cut       = { icon = 'content_cut', label = I18N.cut },
-        paste     = { icon = 'content_paste', label = I18N.paste },
-        move      = { icon = 'drive_file_move', label = I18N.move },
-        delete    = { icon = 'delete', label = I18N.delete },
-        new_group = { icon = 'create_new_folder', label = I18N.create_folder_below },
-        playlist  = { icon = 'playlist_add', label = I18N.add_to_playlist },
+        rename    = { icon = 'edit', label = I18N.rename, key = KEYS.rename },
+        copy      = { icon = 'content_copy', label = I18N.copy, key = KEYS.copy },
+        cut       = { icon = 'content_cut', label = I18N.cut, key = KEYS.cut },
+        paste     = { icon = 'content_paste', label = I18N.paste, key = KEYS.paste },
+        move      = { icon = 'drive_file_move', label = I18N.move, key = KEYS.move },
+        delete    = { icon = 'delete', label = I18N.delete, key = KEYS.delete },
+        new_group = { icon = 'create_new_folder', label = I18N.create_folder_below, key = KEYS.new_group },
+        playlist  = { icon = 'playlist_add', label = I18N.add_to_playlist, key = KEYS.add_to_playlist },
     }
 end
 
@@ -657,7 +658,7 @@ function M._open_more_menu(container, index, ops)
     for _, name in ipairs(ops or M._auto_more_ops()) do
         local def = defs[name]
         if def then
-            items[#items + 1] = { title = def.label, icon = def.icon, value = { more_op = name } }
+            items[#items + 1] = { title = def.label, icon = def.icon, hint = def.key, value = { more_op = name } }
         end
     end
     mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json({
@@ -1189,5 +1190,4 @@ function M.handle_event(json)
 end
 
 return M
-
 
